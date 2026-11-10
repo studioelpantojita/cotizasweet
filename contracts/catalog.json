@@ -1,0 +1,311 @@
+{
+  "schemaVersion": 1,
+  "revision": "catalogo-2026-10-12-v1",
+  "updatedAt": "2026-10-13T01:38:14Z",
+  "referencePrices": true,
+  "products": [
+    {
+      "id": "breakfast",
+      "service": "packs",
+      "name": "Desayunos Premium",
+      "summary": "Una mañana especial, presentada con cuidado.",
+      "description": "Box individual con croissant artesanal, mini repostería, mermelada y bebida. Elige la presentación que acompaña mejor tu ocasión.",
+      "images": [
+        {
+          "src": "/images/breakfast.jpg",
+          "alt": "Presentación referencial de un desayuno en caja",
+          "caption": "Imagen referencial de presentación; el contenido final puede variar."
+        }
+      ],
+      "features": [
+        "Croissant y mini repostería",
+        "Mermelada y bebida a coordinar",
+        "Presentación individual para regalo"
+      ],
+      "conditions": [
+        "Preparación y disponibilidad sujetas a coordinación con el negocio.",
+        "Revisar ingredientes, alérgenos y posible contacto cruzado antes de confirmar el pedido."
+      ],
+      "variants": [
+        {
+          "id": "casa",
+          "label": "Selección de la casa",
+          "quality": "Premium",
+          "detail": "Selección base con presentación de regalo.",
+          "unit": "box individual",
+          "prices": {
+            "PEN": 8500
+          }
+        },
+        {
+          "id": "autor",
+          "label": "Edición de autor",
+          "quality": "Especial",
+          "detail": "Acabado personalizado y detalle de chocolate; contenido por confirmar.",
+          "unit": "box individual",
+          "prices": {
+            "PEN": 11500
+          }
+        }
+      ],
+      "confirmation": {
+        "status": "pending",
+        "note": "El negocio debe confirmar composición, disponibilidad y características antes de emitir una oferta definitiva."
+      },
+      "published": true
+    },
+    {
+      "id": "minibox",
+      "service": "packs",
+      "name": "Boxes de Mini Repostería",
+      "summary": "Pequeñas piezas de autor para grandes momentos.",
+      "description": "Una colección para compartir con mini tartaletas, petits fours y macarons. Sabores, colores y surtido se definen con el negocio.",
+      "images": [
+        {
+          "src": "/images/minibox.jpg",
+          "alt": "Caja referencial de mini repostería",
+          "caption": "Imagen referencial de presentación; el contenido final puede variar."
+        }
+      ],
+      "features": [
+        "Surtido de mini tartaletas y petits fours",
+        "Macarons con sabores por coordinar",
+        "Caja con distribución para compartir"
+      ],
+      "conditions": [
+        "Preparación y disponibilidad sujetas a coordinación con el negocio.",
+        "Revisar ingredientes, alérgenos y posible contacto cruzado antes de confirmar el pedido."
+      ],
+      "variants": [
+        {
+          "id": "casa",
+          "label": "Box de 24 piezas",
+          "quality": "Selección clásica",
+          "detail": "Surtido base de mini repostería.",
+          "unit": "box de 24 piezas",
+          "prices": {
+            "PEN": 14400
+          }
+        },
+        {
+          "id": "autor",
+          "label": "Box de 24 piezas de autor",
+          "quality": "Selección fina",
+          "detail": "Acabados y sabores de autor; composición por confirmar.",
+          "unit": "box de 24 piezas",
+          "prices": {
+            "PEN": 19200
+          }
+        }
+      ],
+      "confirmation": {
+        "status": "pending",
+        "note": "El negocio debe confirmar composición, disponibilidad y características antes de emitir una oferta definitiva."
+      },
+      "published": true
+    },
+    {
+      "id": "sweet",
+      "service": "packs",
+      "name": "Combos Sweet",
+      "summary": "Una mesa dulce con el sello de tu celebración.",
+      "description": "Combo para compartir que combina mini cakes, cupcakes, macarons y chocolates. La propuesta final define sabores, montaje y presentación.",
+      "images": [
+        {
+          "src": "/images/sweet.jpg",
+          "alt": "Composición referencial de una mesa dulce",
+          "caption": "Imagen referencial de presentación; el contenido final puede variar."
+        }
+      ],
+      "features": [
+        "Variedad de formatos de degustación",
+        "Sabores y paleta a coordinar",
+        "Montaje sujeto al alcance del servicio"
+      ],
+      "conditions": [
+        "Preparación y disponibilidad sujetas a coordinación con el negocio.",
+        "Revisar ingredientes, alérgenos y posible contacto cruzado antes de confirmar el pedido."
+      ],
+      "variants": [
+        {
+          "id": "casa",
+          "label": "Combo de 30 piezas",
+          "quality": "Selección clásica",
+          "detail": "Combinación base para compartir.",
+          "unit": "combo de 30 piezas",
+          "prices": {
+            "PEN": 21000
+          }
+        },
+        {
+          "id": "autor",
+          "label": "Combo de 30 piezas de autor",
+          "quality": "Selección fina",
+          "detail": "Presentación temática y acabados personalizados.",
+          "unit": "combo de 30 piezas",
+          "prices": {
+            "PEN": 27500
+          }
+        }
+      ],
+      "confirmation": {
+        "status": "pending",
+        "note": "El negocio debe confirmar composición, disponibilidad y características antes de emitir una oferta definitiva."
+      },
+      "published": true
+    },
+    {
+      "id": "chocolates-finos",
+      "service": "insumos",
+      "name": "Chocolates finos",
+      "summary": "El carácter del cacao en cada detalle.",
+      "description": "Ficha de selección de chocolate para la elaboración de un pack. Se debe confirmar tipo, porcentaje de cacao, endulzante, marca y ficha del proveedor. El importe mostrado es un adicional referencial por pack, no una venta de chocolate por peso.",
+      "images": [
+        {
+          "src": "/images/sweet.jpg",
+          "alt": "Aplicación referencial del chocolate en una selección dulce",
+          "caption": "Aplicación en producto terminado; no es fotografía del insumo certificado."
+        }
+      ],
+      "features": [
+        "Opciones de chocolate y porcentaje de cacao",
+        "Endulzante sujeto a la receta acordada",
+        "Marca, origen y composición por confirmar"
+      ],
+      "conditions": [
+        "Preparación y disponibilidad sujetas a coordinación con el negocio.",
+        "Revisar ingredientes, alérgenos y posible contacto cruzado antes de confirmar el pedido.",
+        "La denominación «fino» y el porcentaje de cacao requieren confirmación del negocio con la ficha del proveedor."
+      ],
+      "variants": [
+        {
+          "id": "leche",
+          "label": "Chocolate con leche",
+          "quality": "Selección fina",
+          "detail": "Cacao, lácteos y endulzante según ficha del proveedor.",
+          "unit": "adicional por pack",
+          "prices": {
+            "PEN": 1200
+          }
+        },
+        {
+          "id": "bitter",
+          "label": "Chocolate negro / bitter",
+          "quality": "Selección de mayor cacao",
+          "detail": "Porcentaje exacto y trazabilidad por confirmar.",
+          "unit": "adicional por pack",
+          "prices": {
+            "PEN": 2000
+          }
+        }
+      ],
+      "confirmation": {
+        "status": "pending",
+        "note": "El negocio debe confirmar composición, disponibilidad y características antes de emitir una oferta definitiva."
+      },
+      "published": true
+    },
+    {
+      "id": "insumos-organicos",
+      "service": "insumos",
+      "name": "Insumos orgánicos",
+      "summary": "Ingredientes seleccionados con origen por verificar.",
+      "description": "Ficha para solicitar insumos de origen orgánico en tu elaboración. El negocio debe verificar proveedor, certificación aplicable, disponibilidad y sustituciones. El nombre de esta ficha expresa una solicitud; no acredita una certificación.",
+      "images": [
+        {
+          "src": "/images/breakfast.jpg",
+          "alt": "Aplicación referencial de ingredientes en un desayuno",
+          "caption": "Ejemplo de aplicación; esta fotografía no acredita origen orgánico."
+        }
+      ],
+      "features": [
+        "Harinas, granos y lácteos por seleccionar",
+        "Frutas de estación sujetas a disponibilidad",
+        "Verificación documental del origen"
+      ],
+      "conditions": [
+        "Preparación y disponibilidad sujetas a coordinación con el negocio.",
+        "Revisar ingredientes, alérgenos y posible contacto cruzado antes de confirmar el pedido.",
+        "No se afirma certificación orgánica hasta contar con confirmación vigente del negocio."
+      ],
+      "variants": [
+        {
+          "id": "estacion",
+          "label": "Selección de estación",
+          "quality": "Origen por verificar",
+          "detail": "Fruta y granos según receta y proveedor.",
+          "unit": "adicional por pack",
+          "prices": {
+            "PEN": 1800
+          }
+        },
+        {
+          "id": "especial",
+          "label": "Selección especial",
+          "quality": "Origen por verificar",
+          "detail": "Harinas y grasas especiales sujetas a confirmación.",
+          "unit": "adicional por pack",
+          "prices": {
+            "PEN": 2800
+          }
+        }
+      ],
+      "confirmation": {
+        "status": "pending",
+        "note": "El negocio debe confirmar composición, disponibilidad y características antes de emitir una oferta definitiva."
+      },
+      "published": true
+    },
+    {
+      "id": "produccion-artesanal",
+      "service": "insumos",
+      "name": "Producción artesanal",
+      "summary": "Elaboración y acabados con atención al detalle.",
+      "description": "Ficha para acordar producción en pequeños lotes, horneado al pedido y decoración manual. El alcance y los tiempos de elaboración se confirman con el taller.",
+      "images": [
+        {
+          "src": "/images/minibox.jpg",
+          "alt": "Aplicación referencial de acabados de mini repostería",
+          "caption": "Presentación de ejemplo; proceso de elaboración por confirmar."
+        }
+      ],
+      "features": [
+        "Pequeños lotes y preparación a coordinar",
+        "Rellenos y acabados definidos por receta",
+        "Presentación individual o en caja"
+      ],
+      "conditions": [
+        "Preparación y disponibilidad sujetas a coordinación con el negocio.",
+        "Revisar ingredientes, alérgenos y posible contacto cruzado antes de confirmar el pedido.",
+        "El acabado base figura incluido en el precio del pack; el acabado especial tiene un adicional."
+      ],
+      "variants": [
+        {
+          "id": "base",
+          "label": "Acabado base",
+          "quality": "Artesanal",
+          "detail": "Elaboración y presentación base incluidas en el pack.",
+          "unit": "incluido en el pack",
+          "prices": {
+            "PEN": 0
+          }
+        },
+        {
+          "id": "manual",
+          "label": "Decoración especial",
+          "quality": "Artesanal de autor",
+          "detail": "Decoración manual adicional según diseño acordado.",
+          "unit": "adicional por pack",
+          "prices": {
+            "PEN": 2500
+          }
+        }
+      ],
+      "confirmation": {
+        "status": "pending",
+        "note": "El negocio debe confirmar composición, disponibilidad y características antes de emitir una oferta definitiva."
+      },
+      "published": true
+    }
+  ]
+}

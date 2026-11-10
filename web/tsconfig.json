@@ -1,0 +1,58 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts",
+    ".next-test/types/**/*.ts",
+    ".next-test/dev/types/**/*.ts",
+    ".next-verify/types/**/*.ts",
+    ".next-verify/dev/types/**/*.ts",
+    ".next-catalog-build/types/**/*.ts",
+    ".next-catalog-build/dev/types/**/*.ts",
+    ".next-local-3200/types/**/*.ts",
+    ".next-local-3200/dev/types/**/*.ts",
+    ".next-verify-sweet/types/**/*.ts",
+    ".next-verify-sweet/dev/types/**/*.ts",
+    ".next-local-3340/types/**/*.ts",
+    ".next-local-3340/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "examples"
+  ]
+}

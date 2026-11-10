@@ -1,0 +1,43 @@
+name: Container verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build production images
+        run: |
+          set -eu
+          docker build -f web/Dockerfile -t cotizasweet-web:ci .
+          docker build -f api-dotnet/Dockerfile -t cotizasweet-api:ci .
+          docker build -f api-python/Dockerfile -t cotizasweet-ruc:ci .
+      - name: Smoke production containers with disposable volumes
+        run: python3 tests/container_smoke.py
+      - name: Ensure a synthetic result exists even when smoke cannot start
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('tests/artifacts/container-smoke.json')
+          if not path.exists():
+              path.parent.mkdir(parents=True,exist_ok=True)
+              path.write_text(json.dumps({'status':'not_run','scope':'Synthetic container verification only.','reason':'A preceding step failed or the job was cancelled before smoke produced a report.'},indent=2),encoding='utf-8')
+          PY
+      - name: Keep sanitized synthetic container result
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cotizasweet-containers-${{ github.run_id }}
+          retention-days: 14
+          if-no-files-found: error
+          path: tests/artifacts/container-smoke.json

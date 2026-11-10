@@ -1,0 +1,82 @@
+{
+  "currency": "PEN",
+  "documentType": "dni",
+  "formVersion": 2,
+  "clientType": "persona_natural",
+  "clientDocument": "12345678",
+  "clientEmail": "",
+  "packageId": "custom",
+  "packageName": "",
+  "clientBudgetCents": null,
+  "business": "",
+  "businessRuc": "",
+  "contact": "900000000",
+  "client": "Cliente de ejemplo",
+  "clientContact": "",
+  "event": "Cumpleaños",
+  "eventDate": "2026-10-28",
+  "issued": "2026-10-07",
+  "validUntil": "2026-10-28",
+  "projectType": "bodas",
+  "projectBrief": "servicio de mini repostería para 30 invitados",
+  "items": [
+    {
+      "id": "minibox",
+      "name": "Boxes de Mini Repostería",
+      "description": "Box de 24 piezas: mini tartaletas, petits fours y macarons. Sabores y selección por coordinar.",
+      "image": "minibox",
+      "quantity": 2,
+      "priceCents": 14400,
+      "category": "pack",
+      "unit": "box de 24 piezas"
+    }
+  ],
+  "materials": [
+    {
+      "name": "Chocolates finos",
+      "detail": "",
+      "confirmed": false,
+      "selected": false,
+      "configuration": {
+        "selections": {},
+        "cacaoPercent": null,
+        "specification": ""
+      }
+    },
+    {
+      "name": "Insumos orgánicos",
+      "detail": "",
+      "confirmed": false,
+      "selected": false,
+      "configuration": {
+        "selections": {},
+        "cacaoPercent": null,
+        "specification": ""
+      }
+    },
+    {
+      "name": "Producción artesanal",
+      "detail": "",
+      "confirmed": false,
+      "selected": false,
+      "configuration": {
+        "selections": {},
+        "cacaoPercent": null,
+        "specification": ""
+      }
+    }
+  ],
+  "dietaryRequirements": "",
+  "allergenNotes": "",
+  "allergenReviewed": false,
+  "pricingVersion": 2,
+  "locationMode": "pickup",
+  "provinceId": "",
+  "districtId": "",
+  "address": "Tiendita “LosPantojados” · Santiago de Surco",
+  "taxPercent": 18,
+  "materialNotes": "",
+  "deliveryCents": 0,
+  "advancePercent": 50,
+  "notes": "Contenido, diseño, disponibilidad y entrega sujetos a confirmación. Los cambios de alcance se cotizan por separado."
+}

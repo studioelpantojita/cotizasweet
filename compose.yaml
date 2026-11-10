@@ -1,0 +1,57 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    environment:
+      NODE_ENV: production
+      APP_ORIGIN: ${APP_ORIGIN}
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE}
+      OIDC_SCOPE: ${OIDC_SCOPE:-openid profile email quotes:read quotes:write}
+      SESSION_SECRET: ${SESSION_SECRET}
+      INTEGRATION_SERVICE_KEY: ${INTEGRATION_SERVICE_KEY}
+      API_BACKEND: dotnet
+      API_BASE_URL: http://api-dotnet:8000
+      OIDC_ALLOW_LOCAL_HTTP: 'false'
+      TRUSTED_CLIENT_IP_HEADER: ${TRUSTED_CLIENT_IP_HEADER:-}
+      DATABASE_PATH: /app/data/web.sqlite
+    ports: ['127.0.0.1:3000:3000']
+    volumes: ['web-data:/app/data']
+    restart: unless-stopped
+    depends_on: [api-dotnet]
+  api-python:
+    build:
+      context: .
+      dockerfile: api-python/Dockerfile
+    environment:
+      APP_ENV: production
+      RUC_PROVIDER: ${RUC_PROVIDER:-decolecta}
+      RUC_API_TOKEN: ${RUC_API_TOKEN}
+      INTEGRATION_SERVICE_KEY: ${INTEGRATION_SERVICE_KEY}
+      OIDC_ALLOW_LOCAL_HTTP: 'false'
+      DATABASE_PATH: /app/data/python.sqlite
+    command: ['uvicorn','ruc_service:app','--host','0.0.0.0','--port','8000','--no-access-log']
+    volumes: ['python-data:/app/data']
+    restart: unless-stopped
+  api-dotnet:
+    build:
+      context: .
+      dockerfile: api-dotnet/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE}
+      INTEGRATION_SERVICE_KEY: ${INTEGRATION_SERVICE_KEY}
+      OIDC_ALLOW_LOCAL_HTTP: 'false'
+      DATABASE_PATH: /app/data/dotnet.sqlite
+      RUC_SERVICE_URL: http://api-python:8000
+    volumes: ['dotnet-data:/app/data']
+    restart: unless-stopped
+    depends_on: [api-python]
+volumes:
+  web-data:
+  python-data:
+  dotnet-data:

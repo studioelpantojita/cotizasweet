@@ -1,0 +1,11 @@
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {createQuotePdf} from '../lib/pdf';
+import {createQuoteSchema,initialQuote} from '../lib/quote';
+import {portfolioService} from '../lib/custom-service';
+const q=createQuoteSchema.parse({...initialQuote(),client:'Cliente de prueba · Valentina',clientDocument:'12345678',contact:'+51 900000000',event:'Celebración de prueba · colección a medida',projectType:'custom',projectBrief:'Propuesta de ejemplo para comprobar contenido, presentación, alcance y recojo.',items:[portfolioService('delicia-fresas',{content:'Torta de vainilla y fresas para 12 personas',presentation:'Caja de regalo con lazo marfil',scope:'Una torta terminada por unidad, sin montaje ni menaje',quantity:2,priceCents:15000,unit:'torta de 12 porciones'})]});
+const fonts={regular:readFileSync('public/fonts/quote-regular.ttf').toString('base64'),bold:readFileSync('public/fonts/quote-bold.ttf').toString('base64')};
+const doc=createQuotePdf(q,'PRUEBA-CARTERA',fonts);
+mkdirSync('../tests/artifacts/pdf',{recursive:true});
+writeFileSync('../tests/artifacts/pdf/cartera-a-medida.pdf',Buffer.from(doc.output('arraybuffer')));
+writeFileSync('../tests/artifacts/cartera-a-medida.json',JSON.stringify(q,null,2));
+console.log(JSON.stringify({pages:doc.getNumberOfPages(),file:'tests/artifacts/pdf/cartera-a-medida.pdf'}));

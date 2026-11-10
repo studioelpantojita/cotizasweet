@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="launcher/EA.Cotiza.Local.csproj" />
+  <Folder Name="/Código de la integración/">
+    <File Path="web/components/client-fields.tsx" />
+    <File Path="web/lib/pdf.ts" />
+    <File Path="api-dotnet/Program.cs" />
+    <File Path="api-dotnet/RucClient.cs" />
+    <File Path="api-python/ruc_service.py" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

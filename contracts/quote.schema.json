@@ -1,0 +1,466 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/Quote",
+  "definitions": {
+    "Quote": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "default": "PEN",
+          "type": "string",
+          "enum": [
+            "PEN",
+            "USD"
+          ]
+        },
+        "documentType": {
+          "type": "string",
+          "enum": [
+            "dni",
+            "ruc"
+          ]
+        },
+        "clientLookup": {
+          "type": "object",
+          "properties": {
+            "ruc": {
+              "type": "string",
+              "pattern": "^\\d{11}$"
+            },
+            "legalName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "status": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "condition": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 160
+            },
+            "checkedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "dataDate": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "demo": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ruc",
+            "legalName",
+            "status",
+            "condition",
+            "source",
+            "checkedAt",
+            "demo"
+          ],
+          "additionalProperties": false
+        },
+        "formVersion": {
+          "default": 1,
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 1
+            },
+            {
+              "type": "number",
+              "const": 2
+            }
+          ]
+        },
+        "clientType": {
+          "default": "persona_natural",
+          "type": "string",
+          "enum": [
+            "persona_natural",
+            "empresa"
+          ]
+        },
+        "clientDocument": {
+          "default": "",
+          "type": "string",
+          "maxLength": 11
+        },
+        "clientEmail": {
+          "default": "",
+          "type": "string",
+          "maxLength": 180
+        },
+        "packageId": {
+          "default": "custom",
+          "type": "string",
+          "enum": [
+            "custom",
+            "essential",
+            "signature",
+            "premium"
+          ]
+        },
+        "packageName": {
+          "default": "",
+          "type": "string",
+          "maxLength": 120
+        },
+        "clientBudgetCents": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "business": {
+          "default": "",
+          "type": "string",
+          "maxLength": 120
+        },
+        "businessRuc": {
+          "default": "",
+          "type": "string",
+          "maxLength": 11
+        },
+        "contact": {
+          "type": "string",
+          "maxLength": 220
+        },
+        "client": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "clientContact": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "event": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "eventDate": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            {
+              "type": "string",
+              "const": ""
+            }
+          ]
+        },
+        "issued": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "validUntil": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "projectType": {
+          "default": "custom",
+          "type": "string",
+          "enum": [
+            "bodas",
+            "cumpleanos",
+            "quinceaneras",
+            "baby-shower",
+            "empresas",
+            "rrpp",
+            "bancos",
+            "fitness",
+            "alergias",
+            "cocteles",
+            "lanzamientos",
+            "custom"
+          ]
+        },
+        "projectBrief": {
+          "default": "",
+          "type": "string",
+          "maxLength": 600
+        },
+        "items": {
+          "minItems": 1,
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 60
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "image": {
+                "type": "string",
+                "enum": [
+                  "cake",
+                  "cupcakes",
+                  "wedding",
+                  "breakfast",
+                  "minibox",
+                  "sweet",
+                  "none"
+                ]
+              },
+              "portfolioId": {
+                "type": "string",
+                "enum": [
+                  "delicia-fresas",
+                  "macarons-napoleon",
+                  "chocolates-royale",
+                  "tarta-pistacho",
+                  "cheesecake-frutos-rojos",
+                  "macarons-valentin",
+                  "ositos-leche",
+                  "cheesecake-new-york",
+                  "tarta-frutos-rojos",
+                  "macarons-eugenie",
+                  "chocolates-champs",
+                  "lucuma",
+                  "macarons-intemporel",
+                  "ositos-oscuro",
+                  "tocino-cielo",
+                  "osito-xxl",
+                  "pera-tropical"
+                ]
+              },
+              "quantity": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999
+              },
+              "priceCents": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000000
+              },
+              "category": {
+                "default": "pack",
+                "type": "string",
+                "enum": [
+                  "pack",
+                  "addon"
+                ]
+              },
+              "unit": {
+                "default": "unidad",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "description",
+              "image",
+              "quantity",
+              "priceCents"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "materials": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "detail": {
+                "type": "string",
+                "maxLength": 400
+              },
+              "confirmed": {
+                "default": false,
+                "type": "boolean"
+              },
+              "selected": {
+                "type": "boolean"
+              },
+              "configuration": {
+                "default": {
+                  "selections": {},
+                  "cacaoPercent": null,
+                  "specification": ""
+                },
+                "type": "object",
+                "properties": {
+                  "selections": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "additionalProperties": {
+                      "maxItems": 12,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 80
+                      }
+                    }
+                  },
+                  "cacaoPercent": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "specification": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "name",
+              "detail"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "dietaryRequirements": {
+          "default": "",
+          "type": "string",
+          "maxLength": 600
+        },
+        "allergenNotes": {
+          "default": "",
+          "type": "string",
+          "maxLength": 600
+        },
+        "allergenReviewed": {
+          "default": false,
+          "type": "boolean"
+        },
+        "pricingVersion": {
+          "default": 1,
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 1
+            },
+            {
+              "type": "number",
+              "const": 2
+            }
+          ]
+        },
+        "locationMode": {
+          "default": "legacy",
+          "type": "string",
+          "enum": [
+            "on_location",
+            "pickup",
+            "legacy"
+          ]
+        },
+        "provinceId": {
+          "default": "",
+          "type": "string",
+          "maxLength": 4
+        },
+        "districtId": {
+          "default": "",
+          "type": "string",
+          "maxLength": 6
+        },
+        "address": {
+          "default": "",
+          "type": "string",
+          "maxLength": 220
+        },
+        "taxPercent": {
+          "default": 0,
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 0
+            },
+            {
+              "type": "number",
+              "const": 18
+            }
+          ]
+        },
+        "materialNotes": {
+          "default": "",
+          "type": "string",
+          "maxLength": 1600
+        },
+        "deliveryCents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000000
+        },
+        "advancePercent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1600
+        }
+      },
+      "required": [
+        "contact",
+        "client",
+        "clientContact",
+        "event",
+        "eventDate",
+        "issued",
+        "validUntil",
+        "items",
+        "deliveryCents",
+        "advancePercent",
+        "notes"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

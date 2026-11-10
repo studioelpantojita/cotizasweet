@@ -1,0 +1,1 @@
+export default function Logout(){return <main className="wrap" style={{padding:'80px 0'}}><h1>Cerrar sesión</h1><p>Se cerrará tu sesión en E&A Cotiza. Tu cuenta del proveedor de identidad permanece abierta.</p><form action="/api/auth/logout" method="post"><button className="btn" type="submit">Cerrar mi sesión</button></form><a href="/cotizar">Volver al cotizador</a></main>;}

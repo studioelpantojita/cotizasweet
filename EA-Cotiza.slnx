@@ -1,0 +1,24 @@
+<Solution>
+  <Project Path="launcher/EA.Cotiza.Local.csproj" />
+  <Project Path="api-dotnet/Cotiza.Api.csproj" />
+  <Folder Name="/TypeScript y Next.js/">
+    <File Path="web/package.json" />
+    <File Path="web/components/client-fields.tsx" />
+    <File Path="web/components/studio.tsx" />
+    <File Path="web/lib/quote.ts" />
+    <File Path="web/lib/pdf.ts" />
+    <File Path="web/server/ruc.ts" />
+  </Folder>
+  <Folder Name="/Python/">
+    <File Path="api-python/ruc_service.py" />
+    <File Path="api-python/domain.py" />
+    <File Path="api-python/main.py" />
+    <File Path="api-python/requirements.lock.txt" />
+  </Folder>
+  <Folder Name="/Inicio y pruebas/">
+    <File Path="scripts/start-local.py" />
+    <File Path="scripts/local-identity.py" />
+    <File Path="tests/integration.py" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

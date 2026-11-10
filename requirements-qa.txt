@@ -1,0 +1,3 @@
+# Quality tooling, separate from application dependencies.
+pip-audit==2.10.1
+pdfplumber==0.11.9

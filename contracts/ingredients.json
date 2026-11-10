@@ -1,0 +1,124 @@
+[
+  {
+    "name": "Chocolates finos",
+    "intro": "Define el chocolate, el cacao y el endulzante de tu propuesta.",
+    "groups": [
+      {
+        "id": "chocolate",
+        "label": "Tipo de chocolate",
+        "options": [
+          "Negro / bitter",
+          "Con leche",
+          "Blanco",
+          "Rubí"
+        ]
+      },
+      {
+        "id": "sweetener",
+        "label": "Tipo de endulzante",
+        "options": [
+          "Azúcar de caña",
+          "Panela",
+          "Miel",
+          "Stevia",
+          "Eritritol",
+          "Sin endulzante añadido"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Insumos orgánicos",
+    "intro": "Compón la selección de ingredientes. Su origen orgánico se confirma con el proveedor.",
+    "groups": [
+      {
+        "id": "dairy",
+        "label": "Lácteos y grasas",
+        "options": [
+          "Leche entera",
+          "Bebida vegetal",
+          "Mantequilla",
+          "Crema de leche",
+          "Aceite de coco",
+          "Manteca de cacao"
+        ]
+      },
+      {
+        "id": "flour",
+        "label": "Harinas y granos",
+        "options": [
+          "Harina de trigo",
+          "Harina integral",
+          "Avena",
+          "Harina de almendras",
+          "Harina de arroz",
+          "Quinua"
+        ]
+      },
+      {
+        "id": "aroma",
+        "label": "Especias y aromas",
+        "options": [
+          "Vainilla natural",
+          "Canela",
+          "Cardamomo",
+          "Café",
+          "Ralladura de cítricos",
+          "Cacao en polvo"
+        ]
+      },
+      {
+        "id": "fruit",
+        "label": "Frutas de estación",
+        "options": [
+          "Fresas",
+          "Arándanos",
+          "Frambuesas",
+          "Mango",
+          "Maracuyá",
+          "Lúcuma",
+          "Plátano"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Producción artesanal",
+    "intro": "Define la elaboración, el acabado y la presentación del pedido.",
+    "groups": [
+      {
+        "id": "process",
+        "label": "Proceso de elaboración",
+        "options": [
+          "Producción en pequeños lotes",
+          "Horneado al pedido",
+          "Rellenos elaborados en el taller",
+          "Decoración manual"
+        ]
+      },
+      {
+        "id": "finish",
+        "label": "Acabado y decoración",
+        "options": [
+          "Buttercream",
+          "Ganache",
+          "Fondant",
+          "Frutas frescas",
+          "Flores comestibles",
+          "Detalles de chocolate"
+        ]
+      },
+      {
+        "id": "presentation",
+        "label": "Formato y presentación",
+        "options": [
+          "Porciones individuales",
+          "Mini repostería",
+          "Torta para compartir",
+          "Caja de regalo",
+          "Mesa dulce"
+        ]
+      }
+    ]
+  }
+]

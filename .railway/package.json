@@ -1,0 +1,8 @@
+{
+  "name": "cotizasweet-infrastructure",
+  "version": "2.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "check": "tsc --noEmit" },
+  "devDependencies": { "railway": "3.16.0", "typescript": "5.9.3", "@types/node": "22.19.19" }
+}

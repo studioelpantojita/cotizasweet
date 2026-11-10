@@ -1,0 +1,30 @@
+name: Infrastructure verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  railway-configuration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: .railway/package-lock.json
+      - name: Install and validate the infrastructure SDK
+        working-directory: .railway
+        run: |
+          npm ci
+          npm run check
+          node check-graph.mjs
+          npm audit --audit-level=moderate
+      - name: Check container bootstrap shell syntax
+        run: sh -n deploy/container-entrypoint.sh
