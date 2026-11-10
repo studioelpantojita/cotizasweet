@@ -1,8 +1,8 @@
 # CotizaSweet 2.1.0
 
-Upgrade de preparación para GitHub público y Railway, conservado en una copia independiente de la versión 2.0.0. Incluye red privada permitida explícitamente, tres imágenes Docker con preparación segura de volúmenes y proceso final sin privilegios, infraestructura Railway versionada y workflows de compilación y smoke de contenedores Linux.
+Upgrade publicado en el repositorio público personal [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet), conservado en una copia independiente de la versión 2.0.0. Incluye red privada permitida explícitamente, tres imágenes Docker con preparación segura de volúmenes y proceso final sin privilegios, infraestructura Railway versionada y workflows de compilación y smoke de contenedores Linux.
 
-Consulta [la guía Railway](docs/RAILWAY.md) y [el estado del upgrade](docs/UPGRADE-2.1.md). La creación/publicación del repositorio y la ejecución remota se registrarán cuando la cuenta esté autenticada. El acta de v2 enlazada más abajo corresponde a la base 2.0.0; no acredita por sí sola estos cambios ni un despliegue público.
+Consulta [la guía Railway](docs/RAILWAY.md), [el estado del upgrade](docs/UPGRADE-2.1.md) y las [ejecuciones de GitHub Actions](https://github.com/studioelpantojita/cotizasweet/actions). El acta de v2 enlazada más abajo corresponde a la base 2.0.0; las ejecuciones de 2.1.0 se identifican por separado y no acreditan un despliegue público de la aplicación.
 
 Versión independiente del 10 de noviembre de 2026. Integra Next.js/TypeScript, ASP.NET Core .NET 10 y Python 3.12 para preparar cotizaciones de pastelería, consultar el catálogo, generar PDF y conservar un historial privado por cuenta.
 
@@ -16,7 +16,7 @@ Esta entrega parte del código de CotizaSweet_micropp y conserva su copia anteri
 - Consulta RUC con caché acotada, agrupación de solicitudes simultáneas del mismo documento y límites de concurrencia, tiempo y respuesta externa.
 - Conservación del nombre guardado al abrir un presupuesto o borrador RUC. Editar el documento limpia su identidad, y guardar o generar un PDF nuevo mantiene la verificación del servidor.
 - Herramientas de respaldo y restauración SQLite, preflight de producción, comprobación de salud y pruebas de seguridad, finanzas, mutación, navegador y rendimiento local.
-- Integración continua y propuestas de actualización de dependencias preparadas para GitHub. Su ejecución remota y la publicación del repositorio quedan pendientes.
+- Integración continua y propuestas de actualización de dependencias activas en GitHub. Las propuestas no se fusionan automáticamente; cada cambio debe superar las comprobaciones y revisarse.
 
 El detalle está en [mejoras web](docs/MEJORAS-WEB.md), [seguridad de la versión 2](docs/SEGURIDAD-V2.md), [operaciones](docs/OPERACIONES.md) e [integración continua](docs/CI.md). La documentación de la copia anterior se conserva como [historial de la versión 1](docs/HISTORIAL-v1.md); sus puertos, resultados y configuración no describen esta instalación.
 
@@ -124,10 +124,10 @@ La integración usa puertos y bases de prueba independientes. No depende del tok
 
 ## Publicación y operación
 
-El repositorio y Actions están preparados para versionar y verificar esta aplicación en GitHub; todavía debe confirmarse la primera ejecución remota. La guía paso a paso de la cuenta personal se realizará en la siguiente fase solicitada por el usuario.
+El código y los workflows están publicados en la cuenta personal. Los resultados verificables se registran en [el estado de 2.1.0](docs/UPGRADE-2.1.md). Railway es el destino elegido para preparar el piloto; falta conectar la cuenta, autorizar el presupuesto y configurar los servicios externos antes del despliegue funcional.
 
 La aplicación necesita servidores para Next.js, .NET y Python, persistencia y autenticación OIDC real. [GitHub Pages publica contenido estático](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages); por ello no ejecuta por sí solo este sistema dinámico. El alojamiento funcional requiere un destino apropiado, como un servidor con contenedores, HTTPS y volúmenes persistentes.
 
 Consulta [despliegue](docs/DESPLIEGUE.md) antes de publicar y [operaciones](docs/OPERACIONES.md) para el preflight y la restauración a una ruta nueva. Los contadores de memoria y la caché RUC se aplican por instancia; varias réplicas requieren un almacén compartido y nuevas pruebas. Los límites globales web pueden agotarse temporalmente y deben complementarse en el proxy. Un respaldo por base no constituye una transacción coordinada entre servicios.
 
-La ejecución de contenedores, TLS público, OIDC comercial, RUC real y la restauración en el alojamiento elegido quedan pendientes de esa fase. La comprobación de estructura de Compose no equivale a construir sus imágenes o levantar servicios.
+Las tres imágenes y su smoke de arranque/persistencia ya se verificaron en Linux mediante GitHub Actions. TLS público, OIDC comercial, RUC real y la restauración en el alojamiento elegido quedan pendientes de la fase de despliegue.

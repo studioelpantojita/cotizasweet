@@ -1,18 +1,18 @@
-# Despliegue de CotizaSweet 2.0.0
+# Despliegue de CotizaSweet 2.1.0
 
-Documento actualizado el 10 de noviembre de 2026 para esta copia independiente. El paquete contiene código, pruebas y configuración de ejemplo. No contiene la base, las sesiones ni las credenciales de la instalación anterior. Los resultados comprobados en esta revisión y sus límites se consignan en [VALIDACION-V2.md](VALIDACION-V2.md).
+Documento actualizado el 10 de noviembre de 2026 para esta copia independiente. El paquete contiene código, pruebas y configuración de ejemplo. No contiene la base, las sesiones ni las credenciales de la instalación anterior. [RAILWAY.md](RAILWAY.md) es la ruta vigente para el alojamiento elegido; esta guía conserva los requisitos comunes y Docker Compose como alternativa. [VALIDACION-V2.md](VALIDACION-V2.md) conserva la evidencia local de v2.0 y sus límites.
 
-La aplicación no se publica mediante este documento. La creación del repositorio personal y su guía paso a paso se realizarán cuando el usuario solicite esa fase. La primera ejecución remota de Actions, el alojamiento, DNS, HTTPS, proveedor OIDC real y RUC real continúan pendientes.
+El código está publicado en el repositorio personal público [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet). La [verificación de contenedores Linux](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172101) y la [validación de infraestructura](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172546) están aprobadas; el [workflow de calidad](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172073) también está aprobado. El alojamiento funcional, dominio HTTPS, proveedor OIDC real y RUC real continúan pendientes.
 
 ## GitHub y alojamiento funcional
 
-GitHub permite conservar versiones del código, revisar cambios y ejecutar el workflow preparado en `.github/workflows/ci.yml`. La configuración de CI y Dependabot se describe en [CI.md](CI.md); incluir esos archivos no demuestra que Actions ya haya pasado en la cuenta personal.
+GitHub permite conservar versiones del código, revisar cambios y ejecutar los workflows publicados. La configuración de CI y Dependabot se describe en [CI.md](CI.md); consultar cada ejecución enlazada para conocer su resultado concreto.
 
 Esta aplicación necesita ejecutar procesos Next.js, ASP.NET Core y Python y conservar volúmenes SQLite. [GitHub Pages es un servicio de alojamiento estático](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages), por lo que no ejecuta las API, las sesiones ni la persistencia de este sistema. El repositorio de GitHub es una parte del versionado y la verificación; el servicio funcional necesita un alojamiento que admita este stack.
 
-Una topología inicial adecuada para evaluar es un servidor con Docker Compose, una instancia de cada servicio, almacenamiento persistente y un proxy con TLS. La elección del proveedor, recursos, dominio, costes y política de operación debe resolverse antes de publicar. No se atribuye capacidad de carga pública a las mediciones locales.
+Railway es el destino elegido para los tres servicios Docker, con dos volúmenes SQLite y solo `web` público; presupuesto, cuenta, región y configuración externa siguen pendientes. Un servidor con Docker Compose y proxy TLS es una alternativa distinta. No se atribuye capacidad de carga pública a las mediciones locales.
 
-## Topología descrita por Compose
+## Alternativa con Docker Compose
 
 `compose.yaml` describe el circuito **navegador → proxy HTTPS → Next.js → .NET → Python RUC → proveedor externo**. El emisor de identidad de desarrollo no forma parte del despliegue de producción.
 
@@ -22,9 +22,11 @@ Una topología inicial adecuada para evaluar es un servidor con Docker Compose, 
 | `api-dotnet` | Validación, cálculo e historial por propietario | Volumen `dotnet-data` |
 | `api-python` | Consulta RUC autenticada entre servicios | Volumen `python-data` |
 
+Compose declara esos **tres volúmenes**. La definición Railway usa **dos**, para `web` y `api-dotnet`: el servicio Python RUC no persiste datos y no necesita volumen. Conservar esta diferencia al configurar respaldos; no crear un tercer volumen Railway por trasladar esta tabla.
+
 El puerto web de Compose está ligado a `127.0.0.1:3000` en el servidor para el proxy local. Los servicios internos no publican puertos hacia Internet. Estos puertos de contenedor/servidor son diferentes de los predeterminados del lanzador local v2: **3340, 8340, 8341 y 9340**.
 
-La revisión de Compose se limita a su configuración con `docker compose --env-file .env.example config --quiet`; el resultado concreto consta en el acta. El daemon Docker no estaba activo durante la revisión, por lo que no se construyeron ni levantaron los contenedores. Los Dockerfiles y el arranque real deben verificarse en el destino antes de una publicación.
+La revisión específica de Compose se limita a `docker compose --env-file .env.example config --quiet`. Las tres imágenes actuales sí se construyeron y aprobaron un smoke con volúmenes sintéticos en la ejecución Linux enlazada. El acceso de esta consola al motor local de Docker Desktop 29.8.1 está denegado. El arranque y la comunicación privada deben comprobarse además en el destino real antes de habilitar acceso funcional.
 
 ## Configuración requerida
 
@@ -44,9 +46,9 @@ Prepara una configuración privada de producción a partir de `.env.example`. Lo
 | `API_BACKEND`, URLs internas | Compose selecciona .NET y los nombres de servicio internos. No enviar esas credenciales al navegador ni publicar las API internas. |
 | Datos y condiciones del negocio | Identidad legal, contactos, precios, impuestos, disponibilidad, políticas y derechos de imágenes confirmados por su responsable. |
 
-La credencial RUC anterior no se importa ni se considera vigente. Si se compartió en chat o con terceros, debe revocarse o rotarse. La consulta real de esta versión sigue pendiente de una credencial nueva y una prueba autorizada del proveedor. Las pruebas demo no verifican datos en SUNAT. El recorrido con DNI permite comprobar el cotizador sin token RUC.
+La credencial RUC anterior no se importa ni se considera vigente. Si se compartió en chat o con terceros, debe revocarse o rotarse. La consulta real de esta versión sigue pendiente de una credencial nueva y una prueba autorizada del proveedor. Las pruebas demo no verifican datos en SUNAT. El recorrido DNI no consulta RUC, pero la definición IaC actual fija `RUC_PROVIDER=decolecta` y Python requiere un token para arrancar; desplegar con RUC deshabilitado exige cambiar expresamente esa configuración y volver a validarla.
 
-El registro OIDC debe emitir los scopes necesarios en el token de acceso. Confirma emisor, audiencia, expiración y separación de sujetos usando dos cuentas reales de prueba antes de habilitar acceso al público. No concedas permisos basándote únicamente en la apariencia del inicio de sesión.
+El proveedor OIDC debe admitir un cliente confidencial con código y PKCE y emitir tokens de acceso **RS256** con los scopes necesarios. Confirma emisor, audiencia, expiración y separación de sujetos usando dos cuentas reales de prueba antes de habilitar acceso al público. No concedas permisos basándote únicamente en la apariencia del inicio de sesión. Para Railway, reservar primero el dominio HTTPS del servicio `web` vacío permite cerrar `APP_ORIGIN` y `/auth/callback` antes del plan final; seguir la secuencia de [RAILWAY.md](RAILWAY.md).
 
 ## Proxy y límites
 
@@ -58,7 +60,7 @@ Los topes globales pueden ser consumidos por un atacante y afectar temporalmente
 
 ## Secuencia de verificación antes de publicar
 
-1. Conservar una versión identificable del código y sus archivos de bloqueo. Ejecutar las comprobaciones descritas en el README y confirmar la primera ejecución limpia de Actions cuando exista el repositorio remoto.
+1. Conservar una versión identificable del código y sus archivos de bloqueo. Comprobar los resultados reales de los tres workflows del repositorio publicado y exigir aprobación del commit que se vaya a desplegar.
 2. Revisar la identidad, precios y condiciones comerciales referenciales; completar únicamente los datos confirmados por el negocio.
 3. Preparar secretos nuevos, OIDC real, origen HTTPS, dominio, proxy, volúmenes y permisos. No llevar el emisor de desarrollo al servidor público.
 4. Ejecutar el preflight y validar la estructura efectiva de Compose, sin imprimir la configuración con secretos:

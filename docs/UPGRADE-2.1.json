@@ -15,12 +15,62 @@
   "railway_graph_offline": "passed",
   "web_production_build": "passed",
   "container_shell_syntax": "passed",
-  "container_build_and_smoke": "pending_engine_access_or_GitHub_Actions",
+  "container_build_and_smoke": "passed_GitHub_Actions_Linux",
   "cloud_deployment": "not_started",
   "integration_backend": "dotnet",
   "integration_status": "passed",
   "integration_http_assertions": 125,
   "browser_checks_passed": 18,
   "github_owner": "studioelpantojita",
-  "github_public_repository": "created; source push pending CLI authorization"
+  "github_public_repository": "published",
+  "github_owner_type": "User",
+  "github_initial_validation": {
+    "date": "2026-11-10",
+    "commit": "7bc13f2537078729a5a558985f51979d5d8ef661",
+    "workflows": [
+      {
+        "name": "CotizaSweet quality",
+        "conclusion": "success",
+        "url": "https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172073"
+      },
+      {
+        "name": "Container verification",
+        "conclusion": "success",
+        "url": "https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172101"
+      },
+      {
+        "name": "Infrastructure verification",
+        "conclusion": "success",
+        "url": "https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172546"
+      }
+    ],
+    "typescript_tests": 34,
+    "python_tests": 70,
+    "python_subtests": 40,
+    "dotnet_security_assertions": 41,
+    "http_assertions_all_backends": 307,
+    "browser_checks": 18,
+    "financial_cases_per_engine": 1565,
+    "invalid_cases_per_engine": 33,
+    "directed_python_mutants": {
+      "generated": 9,
+      "killed": 9,
+      "survived": 0
+    },
+    "pdf_files": 12,
+    "pdf_pages": 35,
+    "persistent_concurrent_writes": 64,
+    "public_http_load": {
+      "requests": 80,
+      "concurrency": 8,
+      "p95_ms": 59.58,
+      "runner_only": true
+    },
+    "limits": [
+      "Synthetic OIDC and RUC only",
+      "Directed mutation scope only",
+      "No cloud deployment",
+      "Dependency audits are time-specific; no container OS audit"
+    ]
+  }
 }

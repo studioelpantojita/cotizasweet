@@ -1,6 +1,6 @@
-# Integración continua preparada para GitHub
+# Integración continua en GitHub
 
-El archivo `.github/workflows/ci.yml` define una comprobación de calidad para un checkout limpio de la raíz de esta aplicación. Se activa en propuestas de cambio, al actualizar `main`/`master` y mediante ejecución manual. Esta entrega prepara los archivos; la primera ejecución remota en la cuenta personal de GitHub queda pendiente de publicar el repositorio y habilitar Actions.
+El archivo `.github/workflows/ci.yml` define una comprobación de calidad para un checkout limpio de la raíz de esta aplicación. Se activa en propuestas de cambio, al actualizar `main`/`master` y mediante ejecución manual. El repositorio público personal [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet) está publicado. Su [primera ejecución completa de calidad](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172073) aprobó el commit `7bc13f2537078729a5a558985f51979d5d8ef661` el 10 de noviembre de 2026. [UPGRADE-2.1.md](UPGRADE-2.1.md) distingue sus resultados de los antecedentes locales.
 
 El job `quality-windows` usa una máquina de GitHub `windows-2025`, Node.js 24, Python 3.12, .NET SDK 10 y Chromium de Playwright. Las dependencias JavaScript se instalan con `npm ci`; .NET restaura con sus archivos de bloqueo y `--locked-mode`; Python utiliza las versiones indicadas en `api-python/requirements.lock.txt` y `requirements-qa.txt`. Las versiones de parche del runtime y la imagen hospedada pueden actualizarse: las versiones efectivas se registran en las salidas de las acciones de instalación y el informe financiero incluye Python/SQLite/SO. Las dependencias tienen caché por archivo de bloqueo, sin rutas de esta computadora. Estas opciones siguen las interfaces documentadas de [setup-node](https://github.com/actions/setup-node), [setup-python](https://github.com/actions/setup-python) y [setup-dotnet](https://github.com/actions/setup-dotnet).
 
@@ -12,7 +12,7 @@ El job `quality-windows` usa una máquina de GitHub `windows-2025`, Node.js 24, 
 | Dependencias JavaScript | `npm audit --audit-level=moderate` aprobado. Las vulnerabilidades de severidad moderada, alta o crítica hacen fallar el job. |
 | Dependencias Python | `python -m pip_audit -r api-python/requirements.lock.txt --disable-pip --no-deps` aprobado. Las vulnerabilidades notificadas hacen fallar el job. |
 | Dependencias .NET | Restauración bloqueada, auditoría NuGet de dependencias directas y transitivas; advertencias de restauración se consideran errores. La configuración de [NuGet Audit](https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages) permite auditar el árbol y tratar los avisos como errores. |
-| Contratos y TypeScript | Generación previa de tipos de rutas con `next typegen` para un checkout limpio; comprobación de tipos y regeneración de contratos sin diferencias respecto al commit. `npm test` es el agregador de las cinco suites de dominio, catálogo, presentaciones, servicios y seguridad HTTP; produce `tests/artifacts/unit-results.json`. |
+| Contratos y TypeScript | Generación previa de tipos de rutas con `next typegen` para un checkout limpio; comprobación de tipos y regeneración de contratos sin diferencias respecto al commit. `npm test` es el agregador de las seis suites de dominio, catálogo, presentaciones, servicios, seguridad HTTP y URL de servicios; produce `tests/artifacts/unit-results.json`. |
 | Compilación | Bundle de producción Next.js, aplicación y lanzador .NET, programa de comprobaciones de seguridad y sonda de paridad compilados en Release. |
 | PDF | Generación de muestras sintéticas; presencia de al menos once PDF y comprobación de texto, importes y límites de página. |
 | Python y operaciones | Catálogo y pruebas pytest de seguridad, entradas, operación y evaluación de rangos del auditor NuGet. |
@@ -36,6 +36,12 @@ Tras pasar todas las comprobaciones, se guardan durante catorce días exclusivam
 
 `.github/dependabot.yml` prepara propuestas semanales de actualización para acciones, npm, Python y los proyectos NuGet. No activa fusión automática. Toda actualización debe pasar esta misma batería y ser revisada antes de incorporarse.
 
+## Contenedores e infraestructura
+
+`.github/workflows/containers.yml` construye las tres imágenes en Ubuntu 24.04 y ejecuta `tests/container_smoke.py` con red, contenedores y volúmenes desechables. Su [primera ejecución](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172101) aprobó arranque, protección de endpoints, UID no root y persistencia después de reiniciar. Publica exclusivamente el informe sintético saneado `container-smoke.json`, incluso si falla el job; no sube logs ni variables.
+
+`.github/workflows/infrastructure.yml` instala el SDK Railway bloqueado, verifica tipos y el grafo offline de tres servicios/dos volúmenes, audita dependencias y revisa la sintaxis del entrypoint. Su [primera ejecución](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172546) está aprobada. No conecta una cuenta Railway ni crea recursos.
+
 ## Alcance pendiente
 
-No se ha ejecutado este workflow en GitHub desde esta entrega. Sus comandos principales se validan por separado en el entorno local según el acta de pruebas, y la instalación limpia remota debe confirmarse con la primera ejecución. La aprobación del job no publica una web ni valida por sí sola Docker, HTTPS, DNS, identidad OIDC comercial, el proveedor RUC real, el alojamiento, la política de respaldo o las condiciones del negocio. Esos elementos pertenecen a la fase de despliegue que se realizará con la cuenta y el destino elegidos.
+Los tres workflows iniciales están aprobados; cada cambio posterior debe consultar su propia ejecución. El job de calidad no publica una web. La construcción y el arranque Docker tienen su workflow separado; HTTPS y DNS públicos, identidad OIDC comercial, proveedor RUC real, alojamiento, política operativa de respaldo y condiciones del negocio requieren comprobación en el destino. Estos elementos pertenecen a la fase de despliegue con Railway.
