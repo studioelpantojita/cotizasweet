@@ -4,11 +4,11 @@
     "net10.0": {
       "JsonSchema.Net": {
         "type": "Direct",
-        "requested": "[9.4.0, )",
-        "resolved": "9.4.0",
-        "contentHash": "muE4nPuzbD9x5XA1mkXJNqX4mhz47oF3EY8qFLY1pyUY7lhXFKq65t/dSKIHeNSLBV17zwZuq24MD1em90rMNg==",
+        "requested": "[9.7.0, )",
+        "resolved": "9.7.0",
+        "contentHash": "uzAiT0JPDQcco/+HUxDvAHfq6rnAGgfWvoPKJxwe9M+OBa22lh2AEA/ni0DSVDWy/38cDhFUd7Ea3EQd2NO+fw==",
         "dependencies": {
-          "JsonPointer.Net": "7.0.2"
+          "JsonPointer.Net": "7.1.0"
         }
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
@@ -38,16 +38,16 @@
       },
       "Json.More.Net": {
         "type": "Transitive",
-        "resolved": "3.0.1",
-        "contentHash": "fRctF2J2SILYG6wqP21drmeEODmCVkVQ/b3MndDu2fT1swfySyUgq7ePCk+aENGlDcIm05fyfjh9vcuqDEfv3w=="
+        "resolved": "3.1.0",
+        "contentHash": "7qGdCuzlojAC0u1a3aPoVyZTEmwnQaEThsTpeeMfMVjj3OmSzXwfY4mHvx8tDJbqr4xB1pMqh9PkjV/Dl7kHzA=="
       },
       "JsonPointer.Net": {
         "type": "Transitive",
-        "resolved": "7.0.2",
-        "contentHash": "oClYHv2ooeRrtPZyC9sb/Za/ie5pGhjTbNHlAyFg4XOCyU+606FdoZKS7UdaWvtsPlrF+U2w0Ja3TRvn5+spyA==",
+        "resolved": "7.1.0",
+        "contentHash": "wht0EXfuazcdA0CuTaCuzk7Mpv7jOyj+BEdTDMX/FfyGVuoeB/ecnIqPA+IOr9GCcQpdvNt5NmRQ8KJzPBWgQQ==",
         "dependencies": {
           "Humanizer.Core": "3.0.10",
-          "Json.More.Net": "3.0.1"
+          "Json.More.Net": "3.1.0"
         }
       },
       "Microsoft.Bcl.Cryptography": {
