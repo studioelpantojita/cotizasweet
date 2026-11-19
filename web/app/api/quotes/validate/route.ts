@@ -12,5 +12,9 @@ export async function POST(request:Request){
   const input=await readQuoteBody(request),result=createQuoteSchema.safeParse(input);
   if(!result.success)return json({error:result.error.issues.map(i=>i.message).join(' '),issues:result.error.issues.map(i=>({path:i.path,message:i.message}))},400);
   return json({quote:await verifyIdentity(result.data)});
- }catch(e){return json({error:e instanceof RucError?e.message:'No se pudo validar la propuesta.'},e instanceof RucError?e.status:503);}
+ }catch(e){
+  const response=json({error:e instanceof RucError?e.message:'No se pudo validar la propuesta.'},e instanceof RucError?e.status:503);
+  if(e instanceof RucError&&e.retryAfter)response.headers.set('Retry-After',String(e.retryAfter));
+  return response;
+ }
 }

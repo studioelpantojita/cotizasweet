@@ -31,7 +31,9 @@ public sealed class RucClient
             if(!response.IsSuccessStatusCode) {
                 var status=(int)response.StatusCode;
                 var message=status switch {400=>"RUC inválido. Revisa el documento.",404=>"RUC no encontrado por la fuente configurada.",429=>"Se alcanzó el límite de consultas RUC. Intenta más tarde.",_=>"El servicio RUC no está disponible. Intenta de nuevo."};
-                throw new RucException(new[]{400,404,429}.Contains(status)?status:503,message,status==429?60:null);
+                var retryAfter=response.Headers.RetryAfter?.Delta?.TotalSeconds;
+                throw new RucException(new[]{400,404,429}.Contains(status)?status:503,message,
+                    status==429?retryAfter is >=1 and <=86400?(int)retryAfter.Value:60:null);
             }
             await response.Content.LoadIntoBufferAsync(16384,timeout.Token);
             var data=JsonNode.Parse(await response.Content.ReadAsStringAsync(timeout.Token))?.AsObject();

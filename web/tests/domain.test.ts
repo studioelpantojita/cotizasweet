@@ -68,7 +68,7 @@ test('creation requires an address on location and rejects invalid numerical val
 test('private owner and immutable quote versions',()=>{
   const owner=ownerKey('https://id.example','alice'),other=ownerKey('https://id.example','bob');
   const quote=quoteSchema.parse(cases[0].quote),a=saveQuote(owner,quote),b=saveQuote(owner,quote);
-  assert.notEqual(a.id,b.id);assert.equal(listQuotes(owner).length,2);assert.deepEqual(listQuotes(other),[]);
+  assert.notEqual(a.id,b.id);assert.equal(listQuotes(owner).quotes.length,2);assert.deepEqual(listQuotes(other),{quotes:[],nextCursor:null});
   assert.notEqual(owner,ownerKey('https://other.example','alice'));
 });
 test('encrypted, one-use transactions and session revocation',()=>{

@@ -1,3 +1,7 @@
 # Quality tooling, separate from application dependencies.
 pip-audit==2.10.1
 pdfplumber==0.11.9
+# Starlette TestClient prefers HTTPX2. Production HTTPX remains locked separately.
+httpx2==2.16.2
+httpcore2==2.16.2
+truststore==0.10.5

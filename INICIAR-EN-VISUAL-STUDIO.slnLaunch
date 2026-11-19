@@ -1,0 +1,8 @@
+[
+  {
+    "Name": "Integración local completa",
+    "Projects": [
+      { "Path": "launcher\\EA.Cotiza.Local.csproj", "Action": "Start" }
+    ]
+  }
+]

@@ -233,7 +233,14 @@ def component_storage():
                 latencies=[x[1] for x in writes]
                 require(len({x[0]['id'] for x in writes})==64, 'Duplicate quote IDs')
                 for owner in ('alice','bob'):
-                    rows=client.get('/api/quotes',headers={'X-Test-Owner':owner}).json()['quotes']
+                    rows=[];cursor=None
+                    while True:
+                        response=client.get('/api/quotes',headers={'X-Test-Owner':owner},params={'cursor':cursor} if cursor else None)
+                        require(response.status_code==200,'Cannot read keyset history')
+                        page=response.json();require(len(page['quotes'])<=20,'Unbounded history page')
+                        rows.extend(page['quotes']);cursor=page['nextCursor']
+                        if cursor is None:break
+                        require(len(rows)<=32,'History cursor repeated a page')
                     require(len(rows)==32, f'User isolation/count failure {owner}')
                     require(all(int(x['quote']['event'].rsplit(' ',1)[1])%2==(0 if owner=='alice' else 1) for x in rows), 'Cross-owner disclosure')
                 injection="alice' OR 1=1 --"

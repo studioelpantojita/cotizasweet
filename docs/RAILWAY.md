@@ -1,22 +1,28 @@
-# Alojamiento de CotizaSweet en Railway
+# E&A Cotiza 2.2.0 en Railway
 
-Railway se eligió como destino administrado para el piloto: ejecuta Node.js/Next.js, ASP.NET Core y Python como servicios Docker independientes dentro del mismo proyecto. Los servicios `web` y `api-dotnet` conservan SQLite en volúmenes separados; `api-python` ejecuta RUC con caché en memoria y no requiere volumen. La contratación, la cuenta conectada y el límite mensual deben confirmarse antes de aplicar recursos. Esta documentación no acredita un despliegue público.
+La definición del piloto contempla tres servicios Docker de este repositorio y tres volúmenes persistentes. Next.js atiende la web, .NET valida y conserva las cotizaciones y Python consulta RUC. El tercer volumen guarda la cuota diaria de consultas para conservarla al reiniciar Python. La entrega 2.2.0 permanece local y su publicación en GitHub queda pendiente de la aprobación expresa del propietario.
 
-## Estado y coste
+El registro de preparación del proyecto acredita la autorización Railway y la creación de `cotizasweet` con un servicio inicial vacío. La activación de Hobby y los controles de gasto efectivos continúan pendientes de comprobar en la cuenta. La puesta en servicio de esta versión requiere revisar el plan del entorno y verificar el despliegue real.
 
-Railway Hobby tiene un mínimo de US$5/mes con US$5 de consumo incluidos. El consumo adicional depende de RAM, CPU, almacenamiento y tráfico. US$15–25/mes es una estimación orientativa para un piloto pequeño, no una cotización ni un tope aprobado. Consultar [precios oficiales](https://docs.railway.com/pricing) y configurar avisos/límite de gasto en la cuenta; el límite puede detener los servicios al alcanzarse.
+## Presupuesto del piloto
 
-El código está publicado en el repositorio personal público [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet). La [construcción de las tres imágenes y su smoke en Linux](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172101) y la [validación de infraestructura](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172546) están aprobadas. El [workflow de calidad](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172073) también está aprobado. Estos resultados no acreditan un despliegue Railway.
+El propietario fijó un máximo de **US$30 mensuales**. Comprueba el plan Hobby, impuestos, almacenamiento y tráfico en la facturación efectiva antes de crear servicios activos. Consulta los importes vigentes en las páginas oficiales de [planes](https://docs.railway.com/pricing/plans) y [facturación](https://docs.railway.com/pricing/understanding-your-bill).
 
-Las credenciales, cotizaciones, sesiones, respaldos, logs y archivos privados no se publican. Mantener los derechos reservados existentes; visibilidad pública no agrega una licencia de código abierto.
+La propuesta presupuestal inicial es una alerta de US$15 y un límite de cómputo de US$20, con margen para los demás conceptos y el gasto de Railway Agent ajustado por separado. Esos controles están pendientes de aplicar. Confirma qué incluye cada ajuste del workspace y recuerda que alcanzar el límite puede detener los servicios. [Control de costes](https://docs.railway.com/pricing/cost-control).
 
-## Infraestructura versionada
+## Definición versionada
 
-`.railway/railway.ts` usa el SDK oficial `railway/iac` y referencia el repositorio verificado `studioelpantojita/cotizasweet`. `COTIZA_GITHUB_REPOSITORY` permite sustituir ese metadato público para otra instalación. `COTIZA_RAILWAY_REGION` debe indicar una región disponible de la cuenta. No contiene un propietario ficticio ni credenciales de despliegue.
+`.railway/railway.ts` usa `railway/iac`. El repositorio predeterminado es `studioelpantojita/cotizasweet` y la fuente GitHub usa `main` con comprobaciones de commit habilitadas. Después de recibir aprobación para publicar esta versión, se deberán revisar sus resultados en [Actions](https://github.com/studioelpantojita/cotizasweet/actions). La CI remota de 2.2.0 está pendiente. Las ejecuciones registradas en los documentos de 2.1.0 se conservan como antecedentes de aquella versión.
 
-Se utiliza Infrastructure as Code actual. La configuración anterior `railway.json` está deprecada según la documentación consultada; no se crea una integración nueva sobre ese formato. Referencias: [IaC](https://docs.railway.com/infrastructure-as-code), [API del SDK](https://docs.railway.com/infrastructure-as-code/reference).
+| Metadato del operador | Uso |
+|---|---|
+| `COTIZA_GITHUB_REPOSITORY` | `propietario/repositorio`, si se necesita sustituir el repositorio predeterminado |
+| `COTIZA_RAILWAY_REGION` | Identificador de una región disponible en la cuenta |
+| `COTIZA_OIDC_PROVIDER` | `google` por defecto y `standard` para otro proveedor OIDC compatible |
 
-Para comprobar el código de infraestructura sin cuenta ni recursos:
+La infraestructura se evalúa con el CLI enlazado al proyecto y entorno elegidos. La revisión del plan debe mostrar los servicios, variables y montajes que correspondan a esta instalación. [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code).
+
+Para validar tipos y el grafo offline desde la raíz ejecuta lo siguiente.
 
 ```powershell
 Push-Location .railway
@@ -26,50 +32,59 @@ node check-graph.mjs
 Pop-Location
 ```
 
-La comprobación offline usa metadatos sintéticos solo dentro de la prueba. Valida tipos y el grafo de tres servicios/dos volúmenes, no la aceptación del plan por una cuenta real. El CLI Railway debe ser compatible con el SDK instalado; usar la versión oficial actual.
+El comprobador usa metadatos sintéticos y exige tres servicios, tres volúmenes y una réplica por servicio. La cuenta y su plan efectivo se verifican al conectar el CLI y emitir el plan del destino.
 
-## Servicios
+## Servicios y volúmenes
 
-| Servicio | Dockerfile desde raíz del repositorio | Puerto | Salud | Volumen |
+| Servicio | Dockerfile desde la raíz | Puerto | Salud | Volumen y contenido |
 |---|---|---:|---|---|
-| `web` | `web/Dockerfile` | 3000 | `/api/health` | `/app/data`, 1 GB inicial |
-| `api-dotnet` | `api-dotnet/Dockerfile` | 8000 | `/health` | `/app/data`, 1 GB inicial |
-| `api-python` | `api-python/Dockerfile` | 8000 | `/health` | No necesario para RUC |
+| `web` | `web/Dockerfile` | 3000 | `/api/health` | `web-data`, `/app/data`, sesiones y límites web |
+| `api-dotnet` | `api-dotnet/Dockerfile` | 8000 | `/health` | `quotes-data`, `/app/data`, cotizaciones y `backups/` |
+| `api-python` | `api-python/Dockerfile` | 8000 | `/health` | `ruc-data`, `/app/data`, contador `ruc-quota.sqlite` |
 
-Los tres servicios usan la raíz completa del monorepo como contexto porque comparten `contracts/`. Cada uno tiene una réplica. Solo `web` debe recibir un dominio público HTTPS; las dos APIs usan la red privada, sin dominio ni proxy TCP público. La aplicación permite HTTP interno únicamente para nombres concretos de Compose y `api-dotnet.railway.internal`/`api-python.railway.internal`; otros destinos remotos requieren HTTPS.
+Cada volumen parte de 1024 MB. La web tiene un límite inicial de 1 CPU y 1 GB de RAM y cada API tiene 0,5 CPU y 512 MB. Mide consumo y rendimiento con el entorno real para ajustar estos límites dentro del presupuesto.
 
-Esta definición está destinada a un **entorno Railway nuevo**. Según [el funcionamiento oficial de la red privada](https://docs.railway.com/networking/private-networking/how-it-works), los entornos creados después del 16 de octubre de 2025 admiten IPv4 e IPv6; los anteriores usan solo IPv6. No aplicar esta receta sin revisión a un entorno legado: comprobar en el destino la resolución privada y las llamadas `web → api-dotnet → api-python`. El smoke de CI verifica una red Docker local y no sustituye esa comprobación de Railway.
+Los builds usan la raíz completa del monorepo porque comparten `contracts/`. Expón el servicio `web` por su dominio HTTPS y conserva las APIs en la red privada. Las URL preparadas son `http://api-dotnet.railway.internal:8000` y `http://api-python.railway.internal:8000`. Comprueba su resolución y la comunicación entre servicios desde el entorno elegido.
 
-La configuración inicial limita memoria a 1 GB en web y 512 MB en cada API y CPU a 1/0,5/0,5. Son límites de partida que requieren medir uso real. No garantizan un gasto total ni capacidad de producción. Los servicios con volúmenes pueden tener una interrupción al redesplegar y no deben escalarse a varias réplicas con esta arquitectura SQLite.
+El entrypoint prepara `/app/data` y luego ejecuta la aplicación con el usuario correspondiente del contenedor. `RAILWAY_RUN_UID=0` se usa en esa preparación y el proceso de aplicación desciende de privilegios. La validación de contenedores debe comprobar el UID final, salud, protección de endpoints, cuota y persistencia de esta versión. Los permisos y la persistencia se revisan también al montar los volúmenes efectivos. [Volúmenes de Railway](https://docs.railway.com/volumes).
 
-## Datos y usuarios de contenedores
+## Variables privadas
 
-Railway monta volúmenes como root. El entrypoint prepara exclusivamente `/app/data`, rechaza que sea un enlace simbólico y después ejecuta la aplicación con `gosu` bajo `node`, `app` o `cotiza`. La aplicación no continúa como root. `RAILWAY_RUN_UID=0` permite el arranque de preparación; el entrypoint baja los privilegios antes de ejecutar el proceso principal. Referencia: [permisos de volúmenes](https://docs.railway.com/volumes).
+Configura las variables compartidas que el archivo IaC referencia.
 
-Las pruebas Docker de CI aprobaron el UID del proceso principal, comunicación interna, protección del historial y persistencia tras reinicio en [Linux](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172101), con configuración y volúmenes sintéticos. En el equipo local se detectó Docker Desktop 29.8.1 ejecutándose, pero el acceso de la consola al motor está denegado; esa limitación no significa que Docker falte y no impidió la verificación remota.
+| Variable compartida | Destino y comprobación |
+|---|---|
+| `APP_ORIGIN` | Origen HTTPS exacto de la web, sin ruta ni parámetros |
+| `OIDC_ISSUER` | `https://accounts.google.com` en el perfil Google |
+| `OIDC_CLIENT_ID` | Identificador del cliente OAuth web de Google, terminado en `.apps.googleusercontent.com` |
+| `OIDC_CLIENT_SECRET` | Secreto del cliente web, conservado en el gestor de secretos |
+| `OIDC_AUDIENCE` | Se usa en el perfil `standard`; para Google la definición referencia el mismo `OIDC_CLIENT_ID` |
+| `SESSION_SECRET` | 32 bytes aleatorios codificados como 64 caracteres hexadecimales |
+| `INTEGRATION_SERVICE_KEY` | Clave independiente de 32 a 256 caracteres ASCII sin espacios para las llamadas entre servicios |
+| `RUC_API_TOKEN` | Credencial nueva y vigente de Decolecta, con su valor directo y privado |
 
-## Configuración privada requerida
+En el perfil Google, la definición aplica `OIDC_PROVIDER=google`, establece la audiencia a partir del client ID compartido y fija `OIDC_SCOPE=openid profile email`. Registra el callback exacto `APP_ORIGIN` seguido de `/auth/callback`. Sigue los pasos de [GOOGLE.md](GOOGLE.md) para el cliente, la audiencia, la privacidad y la prueba con cuentas reales.
 
-Crear variables compartidas reales en el entorno Railway: `APP_ORIGIN`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_AUDIENCE`, `SESSION_SECRET`, `INTEGRATION_SERVICE_KEY` y `RUC_API_TOKEN`. El archivo IaC referencia cada valor solo desde el servicio que lo necesita; RUC_API_TOKEN solo llega a Python. Se debe definir el proveedor OIDC y registrar `https://dominio-real/auth/callback`; el emisor local compartido no se publica.
+Para un proveedor estándar, elige `COTIZA_OIDC_PROVIDER=standard`, configura emisor y audiencia del API y concede `openid profile email quotes:read quotes:write` al cliente web. La configuración y la validación de tokens deben corresponder al perfil elegido.
 
-El proveedor OIDC debe admitir un cliente confidencial con el flujo de código y PKCE, emitir tokens de acceso firmados con **RS256** para el emisor y la audiencia configurados y conceder efectivamente `quotes:read` y `quotes:write`. La definición solicita `openid profile email quotes:read quotes:write`; iniciar sesión sin esos permisos no habilita el historial ni el guardado.
+Python recibe `RUC_PROVIDER=decolecta`, `RUC_DAILY_LIMIT=500` y `RUC_QUOTA_PATH=/app/data/ruc-quota.sqlite`. Su arranque de producción exige la credencial RUC. Cada intento hacia Decolecta reserva cuota antes del envío porque el proveedor podría contabilizar una respuesta fallida. Las respuestas servidas desde caché conservan la reserva existente.
 
-La definición actual fija `RUC_PROVIDER=decolecta`: **un `RUC_API_TOKEN` nuevo y válido es obligatorio**; sin valor Python rechaza el arranque de producción. Lanzar primero solo el recorrido DNI exigiría cambiar expresamente esa configuración a `disabled` y validar de nuevo el alcance; no basta con omitir el token.
+La web y .NET reciben únicamente la clave interna para su relación con RUC. Guarda el token de Decolecta en Python y el secreto OAuth en la web mediante las referencias del archivo IaC. Completa también la identidad comercial, los contactos, los precios y las condiciones que continúan siendo referenciales en la aplicación.
 
-`SESSION_SECRET` exige 32 bytes aleatorios en hexadecimal. `INTEGRATION_SERVICE_KEY` debe ser una clave diferente de 32–256 caracteres ASCII sin espacios. La credencial RUC anterior expuesta debe revocarse y sustituirse. Introducir estos valores directamente en el almacén de secretos de Railway, no en GitHub, `.railway/railway.ts`, capturas o el chat.
+## Aplicar y aceptar el despliegue
 
-Para emitir el plan final: conectar el CLI al proyecto y entorno nuevos de la cuenta, reservar primero el dominio HTTPS, preparar las variables y definir los dos metadatos públicos. Ejecutar `railway config plan` y revisar costes, servicios, volúmenes y permisos antes de `railway config apply`. Si se creó un servicio vacío para reservar el dominio, comprobar que el plan lo reconoce como `web` y conserva ese dominio, sin crear un duplicado. No aplicar esta definición sobre un proyecto ajeno o con datos sin revisar el diff; un plan puede contener eliminaciones.
+Los siguientes pasos quedan pendientes de aprobación para publicar y continuar con el despliegue. La preparación local y sus comprobaciones pueden completarse durante la revisión.
 
-## Secuencia de publicación
+1. Tras recibir la aprobación expresa del propietario, publica el commit de 2.2.0 y revisa las comprobaciones correspondientes a ese commit.
+2. Completa la activación de Hobby y los controles de consumo en la cuenta, verificando el presupuesto máximo total de US$30.
+3. Conecta el CLI al proyecto y entorno seleccionados y define la región. Si existe el servicio vacío creado durante la preparación, comprueba su nombre y cómo lo tratará el plan.
+4. Reserva el dominio HTTPS de `web` y registra el origen y el callback exactos en Google. Introduce las variables compartidas y las claves privadas.
+5. Ejecuta `railway config plan`. Revisa que el plan conserva el servicio y dominio reservados, y que asigna tres servicios y tres volúmenes con sus rutas. Resuelve cualquier diferencia con los datos o servicios existentes antes de aplicar.
+6. Ejecuta `railway config apply` sobre ese proyecto y entorno. Comprueba estado de despliegues, salud, DNS privado y HTTPS público.
+7. Con cuentas reales de prueba, recorre inicio y cierre de sesión, guardado, paginación, reapertura, aislamiento de cotizaciones, PDF y RUC. Usa datos ficticios y registra el commit y los resultados.
+8. Reinicia los servicios y comprueba los datos persistidos, incluida la cuota RUC. Ensaya el respaldo y la restauración a una ruta nueva antes de aceptar la recuperación operativa.
 
-1. Comprobar el commit publicado y el resultado de los tres workflows del repositorio. Los tres workflows iniciales están aprobados en las ejecuciones enlazadas; cada commit que se despliegue debe tener su propia aprobación.
-2. Conectar Railway con autorización de la cuenta y confirmar presupuesto, proyecto, región y entorno nuevo. La contratación no se autoriza por preparar este archivo.
-3. Crear el proyecto y un servicio `web` vacío, sin activar la aplicación, y reservar su dominio HTTPS. Con ese origen definitivo, registrar el callback OIDC y definir `APP_ORIGIN` exacto, sin rutas ni parámetros.
-4. Configurar el proveedor OIDC real y los secretos; revisar el plan final y aplicar los tres servicios y dos volúmenes. Mantener ambas APIs privadas. No habilitar el acceso funcional hasta comprobar configuración, salud, comunicación privada y los recorridos siguientes.
-5. Probar inicio, catálogo, dos usuarios reales, aislamiento, cotización, PDF, RUC y cierre de sesión. Reiniciar y comprobar persistencia de sesiones/cotizaciones.
-6. Activar copias de volúmenes y ensayar restauración SQLite a una ruta nueva. Registrar la etiqueta/commit desplegado y el punto de reversión.
-
-Para construir/verificar localmente desde una terminal con acceso al motor Docker:
+Para construir y verificar las imágenes desde una terminal con acceso al motor Docker ejecuta los mismos comandos que usa la comprobación de contenedores.
 
 ```powershell
 docker build -f web/Dockerfile -t cotizasweet-web:ci .
@@ -78,4 +93,12 @@ docker build -f api-python/Dockerfile -t cotizasweet-ruc:ci .
 python tests/container_smoke.py
 ```
 
-La prueba crea y elimina solamente sus propios contenedores, red y volúmenes sintéticos con nombres únicos. No necesita claves de producción ni prueba el proveedor externo. Los límites y la reversión se detallan en `DESPLIEGUE.md` y `OPERACIONES.md`.
+La prueba utiliza servicios, red y volúmenes sintéticos. Su resultado debe conservarse junto a la copia o commit ejecutado para comprobar las imágenes de esta entrega. El acta identificará el resultado local y cualquier limitación del motor Docker. Esta comprobación local y la futura CI remota deben registrar sus propios resultados.
+
+## Respaldo y recuperación
+
+El trabajador .NET comprueba el calendario al arrancar y cada hora. Cuando han transcurrido al menos 24 horas desde la última copia completa, usa la API SQLite, valida integridad y publica el archivo con sus metadatos de tamaño y SHA-256. Conserva las siete copias completas más recientes en `/app/data/backups` dentro de `quotes-data`.
+
+La retención se cuenta por copias completas. Las interrupciones del servicio pueden ampliar el intervalo entre ellas. Configura en el alojamiento la copia externa del volumen y su retención, que siguen pendientes, para recuperar la información ante pérdida del almacenamiento. Incluye `web-data` y `ruc-data` en el plan de recuperación de sesiones, límites y cuota.
+
+[OPERACIONES.md](OPERACIONES.md) describe el respaldo consistente, la comprobación y la restauración a una ruta nueva. Para una reversión, conserva el commit o etiqueta anterior y un respaldo verificado con esquema compatible, detén escrituras y selecciona explícitamente la ruta restaurada al reiniciar.

@@ -1,4 +1,4 @@
-import {z} from 'zod';
+import {z} from './zod';
 const text=(max:number)=>z.string().trim().min(1).max(max);
 const id=z.string().regex(/^[a-z0-9][a-z0-9-]{0,59}$/);
 export const serviceSchema=z.enum(['packs','insumos']);

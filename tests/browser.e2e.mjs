@@ -8,10 +8,15 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const require=createRequire(resolve(root,'web/package.json'));
 const {chromium}=require('playwright');
 const origin=process.env.E2E_ORIGIN||'http://127.0.0.1:3190';
-const artifacts=resolve(root,'tests/artifacts/browser');mkdirSync(artifacts,{recursive:true});
-const checks=[],errors=[];
+const artifactName=process.env.OIDC_PROVIDER==='google'?'browser-google':'browser';
+const artifacts=resolve(root,'tests/artifacts',artifactName);mkdirSync(artifacts,{recursive:true});
+const checks=[],errors=[],cspViolations=[];
 const browser=await chromium.launch({headless:true,...(process.env.E2E_BROWSER_CHANNEL?{channel:process.env.E2E_BROWSER_CHANNEL}:{})});
 const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true});
+await context.exposeBinding('__qaReportCsp',(_source,directive)=>{cspViolations.push(String(directive));});
+await context.addInitScript(()=>{
+ window.addEventListener('securitypolicyviolation',event=>window.__qaReportCsp(event.effectiveDirective));
+});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 page.on('pageerror',e=>errors.push(e.message));
 function checked(name,condition=true){assert.ok(condition,name);checks.push(name);}
@@ -53,10 +58,18 @@ try{
  await page.getByRole('button',{name:'Guardar',exact:true}).click();await page.getByText(/Guardado ·/).waitFor();
  await page.getByRole('tab',{name:'Presupuestos guardados'}).click();
  await page.getByRole('heading',{name:'Cliente sintético QA navegador',exact:true}).waitFor();checked('Saved quote appears in own history');
+ const legacy=page.locator('.history-row').filter({has:page.getByRole('heading',{name:'QA versión anterior',exact:true})});
+ await legacy.getByText('Versión anterior',{exact:true}).waitFor();
+ checked('A legacy quote preserves the valid history and has no reopen action',await legacy.getByRole('button',{name:'Abrir',exact:true}).count()===0);
+ await page.getByRole('button',{name:'Cargar más propuestas',exact:true}).click();
+ await page.getByRole('button',{name:'Cargar más propuestas',exact:true}).waitFor({state:'hidden'});
+ checked('History loads the next page without losing proposals',await page.locator('.history-row').count()===26);
  await page.locator('.history-row').filter({has:page.getByRole('heading',{name:'Cliente sintético QA navegador',exact:true})}).getByRole('button',{name:'Abrir',exact:true}).click();await amount('354.00');checked('Reopening history preserves totals');
  await page.reload();await amount('354.00');checked('Draft survives reload');
  await page.screenshot({path:resolve(artifacts,'desktop.png'),fullPage:true});
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,deviceScaleFactor:1});
+ await mobile.exposeBinding('__qaReportCsp',(_source,directive)=>{cspViolations.push(String(directive));});
+ await mobile.addInitScript(()=>window.addEventListener('securitypolicyviolation',event=>window.__qaReportCsp(event.effectiveDirective)));
  const mp=await mobile.newPage();await mp.goto(origin+'/cotizar');await mp.locator('#client-document').waitFor();
  checked('Mobile form has no horizontal overflow',await mp.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  await mp.screenshot({path:resolve(artifacts,'mobile.png'),fullPage:true});await mobile.close();
@@ -72,7 +85,9 @@ try{
  await page.getByRole('button',{name:'Consultar de nuevo',exact:true}).click();await page.getByText('Proveedor no disponible',{exact:true}).waitFor();
  checked('Explicit RUC retry reports provider failure',lookups===1);
  checked('No uncaught browser errors',errors.length===0);
- writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'passed',engine:'Chromium',channel:process.env.E2E_BROWSER_CHANNEL||'bundled',checks,uncaughtErrors:errors},null,2));
+ checked('No Content Security Policy violations',cspViolations.length===0);
+ checked('Official brand is visible',await page.getByRole('img',{name:'E&A Cotiza',exact:true}).first().isVisible());
+ writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'passed',engine:'Chromium',provider:process.env.OIDC_PROVIDER||'standard',channel:process.env.E2E_BROWSER_CHANNEL||'bundled',checks,uncaughtErrors:errors,cspViolations},null,2));
  console.log(JSON.stringify({browser:'passed',checks:checks.length}));
 }catch(error){
  await page.screenshot({path:resolve(artifacts,'failure.png'),fullPage:true}).catch(()=>{});

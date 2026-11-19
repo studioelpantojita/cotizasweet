@@ -1,7 +1,13 @@
 import {isValidRuc,clientDocumentType} from '@/lib/identity';
 import {rucIdentitySchema,type Quote} from '@/lib/quote';
 import {serviceBaseUrl} from './config';
-export class RucError extends Error {constructor(message:string,public status=503){super(message);}}
+export class RucError extends Error {
+ constructor(message:string,public status=503,public retryAfter?:number){super(message);}
+}
+function rucRetryAfter(value:string|null){
+ const seconds=value&&/^\d{1,5}$/.test(value)?Number(value):0;
+ return seconds>=1&&seconds<=86400?seconds:60;
+}
 export async function lookupRuc(ruc:string){
  if(!isValidRuc(ruc))throw new RucError('Ingresa un RUC válido, incluido su dígito verificador.',400);
  const secret=process.env.INTEGRATION_SERVICE_KEY||'';
@@ -11,8 +17,9 @@ export async function lookupRuc(ruc:string){
  try{url=new URL('/api/clients/ruc/'+ruc,serviceBaseUrl(base||'http://127.0.0.1:8001'));}catch{throw new RucError('La URL del servicio RUC no es válida o requiere HTTPS.');}
  try{
   const response=await fetch(url,{headers:{'X-Service-Key':secret},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});
+  if(response.status===429)throw new RucError('Se alcanzó el límite de consultas RUC. Intenta más tarde.',429,rucRetryAfter(response.headers.get('Retry-After')));
   const data=await response.json();
-  if(!response.ok)throw new RucError(typeof data.error==='string'?data.error:'No se pudo consultar el RUC.',[400,404,429].includes(response.status)?response.status:503);
+  if(!response.ok)throw new RucError(typeof data.error==='string'?data.error:'No se pudo consultar el RUC.',[400,404].includes(response.status)?response.status:503);
   const parsed=rucIdentitySchema.safeParse(data);
   if(!parsed.success||parsed.data.ruc!==ruc)throw new RucError('La fuente devolvió una respuesta RUC incongruente.');
   return parsed.data;

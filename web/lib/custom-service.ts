@@ -1,4 +1,4 @@
-import {z} from 'zod';
+import {z} from './zod';
 import {showcase} from './sweet-showcase';
 import {itemSchema,type QuoteItem} from './quote';
 

@@ -91,7 +91,7 @@ test('quote proxy preserves upstream 429 and only accepts bounded numeric Retry-
  try{
   for(const [retry,expected] of [['19','19'],['1','1'],['3600','3600'],['0','60'],['86400','60'],['2.5','60'],['tomorrow','60'],['','60']]){
    const fetchMock=t.mock.method(globalThis,'fetch',async()=>new Response('{"error":"private upstream details"}',{status:429,headers:retry?{'Retry-After':retry}:{}}));
-   const response=await getQuotes();
+   const response=await getQuotes(new Request('http://localhost/api/quotes'));
    assert.equal(response.status,429);assert.equal(response.headers.get('retry-after'),expected);
    assert.equal(response.headers.get('cache-control'),'no-store');
    const body=await response.json();assert.match(body.error,/límite/);assert.doesNotMatch(body.error,/private/);
@@ -112,13 +112,13 @@ test('Next quote routes persist separate per-owner read and write limits',async 
  process.env.API_BACKEND='next';process.env.APP_ORIGIN='http://localhost:3000';
  const invalid=()=>request('{','application/json',{'Origin':'http://localhost:3000'});
  try{
-  for(let i=0;i<120;i++)assert.equal((await getQuotes()).status,200);
+  for(let i=0;i<120;i++)assert.equal((await getQuotes(new Request('http://localhost/api/quotes'))).status,200);
   closeDatabase();
-  const blocked=await getQuotes();assert.equal(blocked.status,429);
+  const blocked=await getQuotes(new Request('http://localhost/api/quotes'));assert.equal(blocked.status,429);
   assert.equal(blocked.headers.get('cache-control'),'no-store');assert.ok(Number(blocked.headers.get('retry-after'))>=1);
   for(let i=0;i<120;i++)assert.equal((await postQuote(invalid())).status,400);
   assert.equal((await postQuote(invalid())).status,429);
-  owner='synthetic-bob';assert.equal((await getQuotes()).status,200);assert.equal((await postQuote(invalid())).status,400);
+  owner='synthetic-bob';assert.equal((await getQuotes(new Request('http://localhost/api/quotes'))).status,200);assert.equal((await postQuote(invalid())).status,400);
  }finally{
   if(oldBackend===undefined)delete process.env.API_BACKEND;else process.env.API_BACKEND=oldBackend;
   if(oldOrigin===undefined)delete process.env.APP_ORIGIN;else process.env.APP_ORIGIN=oldOrigin;

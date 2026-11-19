@@ -9,6 +9,21 @@ export function backend() {
   if (!['next','dotnet','python'].includes(value)) throw new Error('API_BACKEND inválido.');
   return value;
 }
+export function oidcProvider() {
+  const provider=process.env.OIDC_PROVIDER||'standard';
+  if(provider!=='standard'&&provider!=='google')throw new Error('OIDC_PROVIDER inválido.');
+  if(provider==='google'){
+    const issuer=new URL(process.env.OIDC_ISSUER||'');
+    const local=process.env.NODE_ENV!=='production'&&process.env.OIDC_ALLOW_LOCAL_HTTP==='true'&&
+      issuer.protocol==='http:'&&['localhost','127.0.0.1'].includes(issuer.hostname);
+    if(!local&&process.env.OIDC_ISSUER!=='https://accounts.google.com')throw new Error('El perfil Google requiere su emisor oficial.');
+    if(!local&&!/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(process.env.OIDC_CLIENT_ID||''))
+      throw new Error('Configura el cliente OAuth web de Google.');
+    if(!process.env.OIDC_CLIENT_ID||process.env.OIDC_AUDIENCE!==process.env.OIDC_CLIENT_ID)
+      throw new Error('La audiencia de Google debe coincidir con el cliente OAuth.');
+  }
+  return provider;
+}
 export function apiUrl() {
   const url = serviceBaseUrl(process.env.API_BASE_URL || 'http://127.0.0.1:8000');
   return new URL('/api/quotes', url);
@@ -22,4 +37,14 @@ export function serviceBaseUrl(value:string) {
 }
 export function sameOrigin(request: Request) {
   return request.headers.get('origin') === appOrigin() && request.headers.get('sec-fetch-site') !== 'cross-site';
+}
+
+export function sameOriginRucRequest(request: Request) {
+  const origin = appOrigin();
+  const claimedOrigin = request.headers.get('origin');
+  const site = request.headers.get('sec-fetch-site');
+  // A cross-origin browser cannot set the custom header without CORS permission.
+  return request.headers.get('x-cotiza-request') === 'ruc' &&
+    (claimedOrigin === null || claimedOrigin === origin) &&
+    (site === null || site === 'same-origin');
 }

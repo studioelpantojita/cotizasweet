@@ -1,9 +1,9 @@
 """Local integration suite. Ephemeral OIDC test issuer; never run as an identity service."""
-import argparse, base64, hashlib, json, os, secrets, shutil, subprocess, sys, tempfile, threading, time
+import argparse, base64, hashlib, json, os, secrets, shutil, sqlite3, subprocess, sys, tempfile, threading, time, uuid
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, urlencode
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from process_tree import OwnedProcess
 import httpx, jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -16,6 +16,7 @@ CLIENT='ea-cotiza-web'
 SECRET=secrets.token_urlsafe(32)
 CODES={}
 CHECK_COUNT=0
+DEFAULT_SUBJECT='alice'
 
 @contextmanager
 def isolated_directory():
@@ -33,7 +34,7 @@ def isolated_directory():
                 time.sleep(.1)
 def token(sub='alice',scope='quotes:read quotes:write',**overrides):
     now=int(time.time())
-    claims=dict(iss=ISSUER,sub=sub,aud=AUDIENCE,iat=now,exp=now+900,scope=scope)
+    claims=dict(iss=ISSUER,sub=sub,aud=AUDIENCE,iat=now,exp=now+900,scope=scope,email_verified=True)
     claims.update(overrides)
     return jwt.encode(claims,KEY,algorithm='RS256',headers={'kid':'test-key'})
 
@@ -59,9 +60,15 @@ class Issuer(BaseHTTPRequestHandler):
         challenge=base64.urlsafe_b64encode(hashlib.sha256(p.get('code_verifier','').encode()).digest()).decode().rstrip('=')
         if not valid_secret or not original or challenge!=original['code_challenge'] or p.get('redirect_uri')!=original['redirect_uri']:
             self.json({'error':'invalid_grant'},400);return
-        sub=original.get('test_user','alice');scope=original.get('scope','')
-        identity=token(sub,aud=CLIENT,nonce=original['nonce'],name='Usuario de prueba',email='demo@example.test')
-        self.json(dict(access_token=token(sub,scope),id_token=identity,token_type='Bearer',expires_in=900,scope=scope))
+        sub=original.get('test_user',DEFAULT_SUBJECT);scope=original.get('scope','')
+        identity_claims={}
+        if original.get('test_identity')=='wrong-azp':identity_claims['azp']='another-client'
+        if original.get('test_identity')=='unverified':identity_claims['email_verified']=False
+        identity=token(sub,aud=CLIENT,nonce=original['nonce'],name='Usuario de prueba',email='demo@example.test',**identity_claims)
+        result=dict(access_token=token(sub,original.get('test_token_scope',scope)),id_token=identity,token_type='Bearer',expires_in=900,scope=scope)
+        if original.get('test_scope_mode')=='omit':result.pop('scope')
+        if original.get('test_scope_mode')=='empty':result['scope']=''
+        self.json(result)
 
 def check(condition,message):
     global CHECK_COUNT
@@ -92,7 +99,7 @@ def catalog_checks(client):
     check(client.post('/api/catalog',json=data).status_code==405,'Publicación anónima permitida')
     check(client.delete('/api/catalog').status_code==405,'Borrado anónimo permitido')
 
-def api_checks(base):
+def api_checks(base,google=False):
     quote=json.loads((ROOT/'contracts/example-quote.json').read_text(encoding='utf-8'))
     cases=json.loads((ROOT/'contracts/pricing-cases.json').read_text(encoding='utf-8'))
     with httpx.Client(base_url=base,timeout=15,trust_env=False) as client:
@@ -100,7 +107,11 @@ def api_checks(base):
         check(client.get('/api/quotes').status_code==401,'API acepta anónimo')
         for bad in [token(aud='another-api'),token(iss='https://wrong.example'),token(exp=int(time.time())-100),token()+'broken']:
             check(client.get('/api/quotes',headers={'Authorization':'Bearer '+bad}).status_code==401,'API acepta token inválido')
-        check(client.get('/api/quotes',headers={'Authorization':'Bearer '+token(scope='openid')}).status_code==403,'Falta control de scope')
+        check(client.get('/api/quotes',headers={'Authorization':'Bearer '+token(scope='openid')}).status_code==(200 if google else 403),'Permisos del perfil de identidad incorrectos')
+        if google:
+            for invalid in [token(email_verified=False),token(email_verified=None),token(azp='another-client'),token(aud=[AUDIENCE,'another-client'])]:
+                check(client.get('/api/quotes',headers={'Authorization':'Bearer '+invalid}).status_code==401,'Google acepta identidad no verificada o de otro cliente')
+            check(client.get('/api/quotes',headers={'Authorization':'Bearer '+token(aud=[AUDIENCE,'another-client'],azp=AUDIENCE)}).status_code==200,'Google rechaza múltiples audiencias con parte autorizada válida')
         auth={'Authorization':'Bearer '+token()}
         for case in cases:
             if case['quote']['pricingVersion']!=2:
@@ -143,9 +154,9 @@ def portfolio_checks(client,quote,headers):
     check(stored['quote']['address']=='Tienda LosPantojados' and stored['quote']['materials']==[],'Altera recojo o requiere insumos')
     check(client.post('/api/quotes',json={**custom,'items':[{**item,'portfolioId':'unknown'}]},headers=headers).status_code==400,'Acepta una referencia de cartera inexistente')
 
-def login(client,user):
+def login(client,user,**authorization):
     start=client.get('/auth/login');check(start.status_code==307,'No inicia OIDC: '+start.text)
-    location=start.headers['location']+'&test_user='+user
+    location=start.headers['location']+'&'+urlencode({'test_user':user,**authorization})
     query=parse_qs(urlparse(location).query)
     check(query.get('code_challenge_method')==['S256'] and all(x in query for x in ['state','nonce','code_challenge']),'Falta PKCE/state/nonce')
     authorize=client.get(location);callback=authorize.headers['location']
@@ -165,7 +176,9 @@ def web_checks():
         check(a.get('/cotizar').status_code==200,'Cotizador no responde')
         check(a.get('/api/quotes',headers={'oai-authenticated-user-id':'spoofed','oai-authenticated-user-email':'fake@example.test'}).status_code==401,'Se aceptó identidad por cabecera')
         for ruc,status in [('00000000000',400),('20131312954',400),('20131312955',404),('20999999990',200)]:
-            result=a.get('/api/clients/ruc/'+ruc);check(result.status_code==status,'Consulta RUC: '+result.text)
+            result=a.get('/api/clients/ruc/'+ruc,headers={'X-Cotiza-Request':'ruc'});check(result.status_code==status,'Consulta RUC: '+result.text)
+        for headers in [{},{'X-Cotiza-Request':'ruc','Sec-Fetch-Site':'cross-site'},{'X-Cotiza-Request':'ruc','Origin':'https://another.example.test'}]:
+            check(a.get('/api/clients/ruc/20999999990',headers=headers).status_code==403,'RUC acepta consulta de otro sitio o sin cabecera del cliente')
         ruc_quote={**quote,'documentType':'ruc','clientType':'empresa','clientDocument':'20999999990','client':'PASTELERÍA DE DEMOSTRACIÓN S.A.C.'}
         check(a.post('/api/quotes/validate',json=ruc_quote,headers={'Origin':'https://evil.example'}).status_code==403,'PDF permite CSRF')
         check(a.post('/api/quotes/validate',json={**ruc_quote,'client':'Manipulado'},headers={'Origin':origin}).status_code==400,'PDF acepta razón social manipulada')
@@ -192,10 +205,66 @@ def web_checks():
         url=url.split('&state=')[0]+'&state=invalid'
         check(c.get(url).status_code==401,'State inválido aceptado')
 
-def run(mode):
+def owner_key(subject):
+    return hashlib.sha256(json.dumps([ISSUER,subject],separators=(',',':')).encode()).hexdigest()
+
+def seed_history(database,subject,count=45):
+    quote=json.loads((ROOT/'contracts/example-quote.json').read_text(encoding='utf-8'))
+    owner=owner_key(subject)
+    with closing(sqlite3.connect(database,timeout=5)) as db:
+        for index in range(count):
+            record={**quote,'client':f'QA paginación {index:02d}'}
+            if index==0:record.update(projectType='navidad',client='QA versión anterior')
+            payload='{invalid json' if index==1 else json.dumps(record)
+            created='2026-01-02T00:00:00.000Z' if index<2 else '2026-01-01T00:00:00.000Z'
+            db.execute('INSERT INTO quotes VALUES (?,?,?,?,?)',(str(uuid.uuid4()),owner,payload,33984,created))
+        db.commit()
+
+def paged_history_checks(client,headers=None):
+    ids=[];cursor=None;pages=0
+    while True:
+        response=client.get('/api/quotes',headers=headers,params={'cursor':cursor} if cursor else None)
+        check(response.status_code==200,'Falla página de historial')
+        page=response.json();rows=page['quotes']
+        check(len(rows)<=20 and 'nextCursor' in page,'Historial no acotado')
+        ids.extend(row['id'] for row in rows);pages+=1
+        if pages==1:
+            check(any(row['quote'] is None for row in rows),'Payload corrupto ocultó la página')
+            check(any(isinstance(row['quote'],dict) and row['quote'].get('projectType')=='navidad' for row in rows),'Propuesta anterior desapareció')
+        cursor=page['nextCursor']
+        if cursor is None:break
+        check(pages<5,'Cursor sin progreso')
+    check(len(ids)==45 and len(set(ids))==45 and pages==3,'Paginación pierde o duplica propuestas')
+    for query in ['cursor=bad','cursor=','cursor=bad&cursor=bad']:
+        check(client.get('/api/quotes?'+query,headers=headers).status_code==400,'Cursor inválido aceptado')
+
+def scope_fallback_checks():
+    origin='http://127.0.0.1:3190'
+    quote=json.loads((ROOT/'contracts/example-quote.json').read_text(encoding='utf-8'))
+    cases=[('omitted',{'test_scope_mode':'omit'},200,201),
+           ('explicit-empty',{'test_scope_mode':'empty'},403,403),
+           ('omitted-read-only',{'test_scope_mode':'omit','test_token_scope':'quotes:read'},200,403)]
+    for user,params,read_status,write_status in cases:
+        with httpx.Client(base_url=origin,timeout=60,trust_env=False) as client:
+            login(client,'scope-'+user,**params)
+            check(client.get('/api/quotes').status_code==read_status,'Permiso de lectura OIDC incorrecto')
+            check(client.post('/api/quotes',json=quote,headers={'Origin':origin}).status_code==write_status,'Fallback OIDC elevó permisos o rechazó alcance concedido')
+
+def google_callback_checks():
+    for identity in ('wrong-azp','unverified'):
+        with httpx.Client(base_url='http://127.0.0.1:3190',timeout=60,trust_env=False) as client:
+            start=client.get('/auth/login')
+            check(start.status_code==307,'No inicia transacción Google de regresión')
+            authorize=client.get(start.headers['location']+'&'+urlencode({'test_identity':identity}))
+            check(client.get(authorize.headers['location']).status_code==401,'Callback Google acepta correo o parte autorizada inválidos')
+            check(client.get('/api/quotes').status_code==401,'Callback rechazado creó una sesión')
+
+def run(mode,provider='standard'):
+    global AUDIENCE, DEFAULT_SUBJECT
+    AUDIENCE=CLIENT if provider=='google' else 'ea-cotiza-api'
     processes=[]
     with isolated_directory() as temp:
-        env={**{k:v for k,v in os.environ.items() if not k.lower().endswith('_proxy')},'OIDC_ISSUER':ISSUER,'OIDC_AUDIENCE':AUDIENCE,'OIDC_CLIENT_ID':CLIENT,'OIDC_CLIENT_SECRET':SECRET,'SESSION_SECRET':secrets.token_hex(32),'OIDC_ALLOW_LOCAL_HTTP':'true','APP_ENV':'development','ASPNETCORE_ENVIRONMENT':'Development','APP_ORIGIN':'http://127.0.0.1:3190','API_BACKEND':mode,'API_BASE_URL':'http://127.0.0.1:8190','NEXT_TELEMETRY_DISABLED':'1','NODE_ENV':'development','NEXT_DIST_DIR':'.next-test','RUC_PROVIDER':'demo','INTEGRATION_SERVICE_KEY':secrets.token_urlsafe(48),'RUC_SERVICE_URL':'http://127.0.0.1:8191'}
+        env={**{k:v for k,v in os.environ.items() if not k.lower().endswith('_proxy')},'OIDC_PROVIDER':provider,'OIDC_ISSUER':ISSUER,'OIDC_AUDIENCE':AUDIENCE,'OIDC_CLIENT_ID':CLIENT,'OIDC_CLIENT_SECRET':SECRET,'SESSION_SECRET':secrets.token_hex(32),'OIDC_ALLOW_LOCAL_HTTP':'true','APP_ENV':'development','ASPNETCORE_ENVIRONMENT':'Development','APP_ORIGIN':'http://127.0.0.1:3190','API_BACKEND':mode,'API_BASE_URL':'http://127.0.0.1:8190','NEXT_TELEMETRY_DISABLED':'1','NODE_ENV':'development','NEXT_DIST_DIR':'.next-test','RUC_PROVIDER':'demo','INTEGRATION_SERVICE_KEY':secrets.token_urlsafe(48),'RUC_SERVICE_URL':'http://127.0.0.1:8191'}
         with open(Path(temp)/'services.log','w+') as log:
             try:
                 ruc=OwnedProcess([sys.executable,'-m','uvicorn','ruc_service:app','--host','127.0.0.1','--port','8191','--no-access-log'],cwd=ROOT/'api-python',env=env,stdout=log,stderr=log);processes.append(ruc);wait_http('http://127.0.0.1:8191/health',ruc)
@@ -203,11 +272,21 @@ def run(mode):
                 if mode!='next':
                     env_api={**env,'DATABASE_PATH':str(Path(temp)/'api.sqlite'),'ASPNETCORE_URLS':'http://127.0.0.1:8190'}
                     command=[sys.executable,'-m','uvicorn','main:app','--host','127.0.0.1','--port','8190'] if mode=='python' else [os.environ.get('DOTNET_EXEC','dotnet'),str(ROOT/'api-dotnet/bin/Release/net10.0/Cotiza.Api.dll')]
-                    proc=OwnedProcess(command,cwd=ROOT/('api-python' if mode=='python' else 'api-dotnet'),env=env_api,stdout=log,stderr=log);processes.append(proc);wait_http('http://127.0.0.1:8190/health',proc);api_checks('http://127.0.0.1:8190')
+                    proc=OwnedProcess(command,cwd=ROOT/('api-python' if mode=='python' else 'api-dotnet'),env=env_api,stdout=log,stderr=log);processes.append(proc);wait_http('http://127.0.0.1:8190/health',proc);api_checks('http://127.0.0.1:8190',provider=='google')
                 proc=OwnedProcess([os.environ.get('NODE_EXEC','node'),'node_modules/next/dist/bin/next','dev','--webpack','--hostname','127.0.0.1','--port','3190'],cwd=ROOT/'web',env={**env,'DATABASE_PATH':str(Path(temp)/'web.sqlite')},stdout=log,stderr=log);processes.append(proc);wait_http('http://127.0.0.1:3190/',proc);web_checks()
+                database=Path(temp)/('web.sqlite' if mode=='next' else 'api.sqlite')
+                seed_history(database,'page-alice')
+                with httpx.Client(base_url='http://127.0.0.1:3190',timeout=60,trust_env=False) as paged:
+                    login(paged,'page-alice')
+                    paged_history_checks(paged)
+                if provider=='standard':scope_fallback_checks()
+                else:google_callback_checks()
                 if os.environ.get('RUN_BROWSER_E2E')=='1' and mode=='dotnet':
-                    subprocess.run([os.environ.get('NODE_EXEC','node'),str(ROOT/'tests/browser.e2e.mjs')],cwd=ROOT,env=env,check=True)
-                print('PASS:',mode,'— OIDC/PKCE, sesiones, permisos, historial aislado, cotizaciones, importes y validaciones',flush=True)
+                    seed_history(database,'browser-alice',25)
+                    DEFAULT_SUBJECT='browser-alice'
+                    try:subprocess.run([os.environ.get('NODE_EXEC','node'),str(ROOT/'tests/browser.e2e.mjs')],cwd=ROOT,env=env,check=True)
+                    finally:DEFAULT_SUBJECT='alice'
+                print('PASS:',mode,provider,'— OIDC/PKCE, sesiones, permisos, historial paginado aislado, cotizaciones, importes y validaciones',flush=True)
             except Exception:
                 log.flush();log.seek(0)
                 # Do not output callback URLs/codes or tokens from dev logs.
@@ -218,10 +297,11 @@ def run(mode):
                     proc.stop()
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--backend',choices=['next','python','dotnet','all'],default='all');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--backend',choices=['next','python','dotnet','all'],default='all');parser.add_argument('--provider',choices=['standard','google','all'],default='all');args=parser.parse_args()
     server=ThreadingHTTPServer(('127.0.0.1',9190),Issuer);threading.Thread(target=server.serve_forever,daemon=True).start()
     try:
-        for mode in (['next','python','dotnet'] if args.backend=='all' else [args.backend]):run(mode)
+        for provider in (['standard','google'] if args.provider=='all' else [args.provider]):
+            for mode in (['next','python','dotnet'] if args.backend=='all' else [args.backend]):run(mode,provider)
     finally:server.shutdown();server.server_close()
     evidence=ROOT/'tests/artifacts';evidence.mkdir(parents=True,exist_ok=True)
-    (evidence/'integration-results.json').write_text(json.dumps({'status':'passed','backend':args.backend,'assertions':CHECK_COUNT,'real_services':True,'oidc':'ephemeral test issuer','ruc':'demo'},indent=2),encoding='utf-8')
+    (evidence/'integration-results.json').write_text(json.dumps({'status':'passed','backend':args.backend,'provider':args.provider,'assertions':CHECK_COUNT,'real_services':True,'oidc':'ephemeral test issuer; Google-compatible claims are synthetic','ruc':'demo'},indent=2),encoding='utf-8')

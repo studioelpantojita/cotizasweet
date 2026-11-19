@@ -1,96 +1,65 @@
-# Despliegue de CotizaSweet 2.1.0
+# Despliegue de E&A Cotiza 2.2.0
 
-Documento actualizado el 10 de noviembre de 2026 para esta copia independiente. El paquete contiene código, pruebas y configuración de ejemplo. No contiene la base, las sesiones ni las credenciales de la instalación anterior. [RAILWAY.md](RAILWAY.md) es la ruta vigente para el alojamiento elegido; esta guía conserva los requisitos comunes y Docker Compose como alternativa. [VALIDACION-V2.md](VALIDACION-V2.md) conserva la evidencia local de v2.0 y sus límites.
+Guía revisada el 19 de noviembre de 2026 para la copia local 2.2.0. La publicación en GitHub y la continuación del despliegue quedan pendientes de la aprobación expresa del propietario. Los resultados de versiones anteriores se conservan en [UPGRADE-2.1.md](UPGRADE-2.1.md) y [VALIDACION-V2.md](VALIDACION-V2.md). [RAILWAY.md](RAILWAY.md) contiene la receta del alojamiento elegido y [REVISION-MANUAL-2.2.md](REVISION-MANUAL-2.2.md) permite revisar la entrega desde Visual Studio.
 
-El código está publicado en el repositorio personal público [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet). La [verificación de contenedores Linux](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172101) y la [validación de infraestructura](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172546) están aprobadas; el [workflow de calidad](https://github.com/studioelpantojita/cotizasweet/actions/runs/42917172073) también está aprobado. El alojamiento funcional, dominio HTTPS, proveedor OIDC real y RUC real continúan pendientes.
+Railway es el destino preparado para el piloto, con un presupuesto máximo de **US$30 mensuales**. La activación del plan, los controles de gasto efectivos, la región, el dominio, los secretos y la aceptación del servicio público requieren comprobarse en la cuenta. El repositorio existente es [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet). La CI remota de esta versión se ejecutará después de recibir aprobación para publicar su código.
 
-## GitHub y alojamiento funcional
+La aplicación requiere procesos Next.js, ASP.NET Core .NET 10 y Python 3.12 y almacenamiento SQLite persistente. La definición de Railway y `compose.yaml` usan **tres servicios y tres volúmenes**. El volumen Python conserva la cuota diaria de RUC.
 
-GitHub permite conservar versiones del código, revisar cambios y ejecutar los workflows publicados. La configuración de CI y Dependabot se describe en [CI.md](CI.md); consultar cada ejecución enlazada para conocer su resultado concreto.
+| Servicio | Función | Volumen Compose | Volumen Railway |
+|---|---|---|---|
+| `web` | Interfaz, sesión, BFF y límites públicos | `web-data` | `web-data` |
+| `api-dotnet` | Validación, cálculo, historial y copias automáticas | `dotnet-data` | `quotes-data` |
+| `api-python` | Servicio RUC y contador diario persistente | `python-data` | `ruc-data` |
 
-Esta aplicación necesita ejecutar procesos Next.js, ASP.NET Core y Python y conservar volúmenes SQLite. [GitHub Pages es un servicio de alojamiento estático](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages), por lo que no ejecuta las API, las sesiones ni la persistencia de este sistema. El repositorio de GitHub es una parte del versionado y la verificación; el servicio funcional necesita un alojamiento que admita este stack.
+Cada volumen se monta en `/app/data`. Los builds usan la raíz completa del monorepo porque comparten `contracts/`. En el destino se expone `web` por HTTPS y las API se comunican por la red privada. Compose liga la web a `127.0.0.1:3000` para un proxy del servidor. La copia de revisión de este ordenador usa los puertos 3350, 8350, 8351 y 9350, guardados en su configuración privada.
 
-Railway es el destino elegido para los tres servicios Docker, con dos volúmenes SQLite y solo `web` público; presupuesto, cuenta, región y configuración externa siguen pendientes. Un servidor con Docker Compose y proxy TLS es una alternativa distinta. No se atribuye capacidad de carga pública a las mediciones locales.
+Las tres imágenes de producción se construyeron y aprobaron el smoke local ejecutado por el propietario desde PowerShell con acceso a Docker Desktop. `tests/artifacts/container-smoke.json` registra tres servicios y tres volúmenes, UID finales de aplicación 1000 para web, 1654 para .NET y 10001 para RUC, persistencia de cuota web y RUC, respaldo automático .NET y persistencia al reiniciar la API. El recorrido usa configuración e identidades sintéticas. La comprobación de la infraestructura en Railway se completa en el destino efectivo.
 
-## Alternativa con Docker Compose
+La configuración privada parte de `.env.example` y del gestor de secretos del alojamiento. Registra los siguientes valores para el entorno.
 
-`compose.yaml` describe el circuito **navegador → proxy HTTPS → Next.js → .NET → Python RUC → proveedor externo**. El emisor de identidad de desarrollo no forma parte del despliegue de producción.
-
-| Servicio | Función | Persistencia |
-|---|---|---|
-| `web` | Interfaz, BFF, transacción OIDC, sesiones y límites públicos | Volumen `web-data` |
-| `api-dotnet` | Validación, cálculo e historial por propietario | Volumen `dotnet-data` |
-| `api-python` | Consulta RUC autenticada entre servicios | Volumen `python-data` |
-
-Compose declara esos **tres volúmenes**. La definición Railway usa **dos**, para `web` y `api-dotnet`: el servicio Python RUC no persiste datos y no necesita volumen. Conservar esta diferencia al configurar respaldos; no crear un tercer volumen Railway por trasladar esta tabla.
-
-El puerto web de Compose está ligado a `127.0.0.1:3000` en el servidor para el proxy local. Los servicios internos no publican puertos hacia Internet. Estos puertos de contenedor/servidor son diferentes de los predeterminados del lanzador local v2: **3340, 8340, 8341 y 9340**.
-
-La revisión específica de Compose se limita a `docker compose --env-file .env.example config --quiet`. Las tres imágenes actuales sí se construyeron y aprobaron un smoke con volúmenes sintéticos en la ejecución Linux enlazada. El acceso de esta consola al motor local de Docker Desktop 29.8.1 está denegado. El arranque y la comunicación privada deben comprobarse además en el destino real antes de habilitar acceso funcional.
-
-## Configuración requerida
-
-Prepara una configuración privada de producción a partir de `.env.example`. Los ejemplos son marcadores y no acreditan un servicio externo. Usa el gestor de secretos del alojamiento o un archivo de permisos restringidos; no incluyas secretos en el repositorio, imágenes, informes, capturas o paquetes de entrega.
-
-| Variable o requisito | Comprobación del operador |
+| Requisito | Comprobación del operador |
 |---|---|
-| `APP_ORIGIN` | Origen público HTTPS exacto, sin ruta, usuario ni parámetros. El proxy debe conservar ese origen. |
-| `OIDC_ISSUER` | Emisor HTTPS real del proveedor elegido, con su ruta/realm exacta si corresponde. |
-| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_AUDIENCE` | Cliente confidencial y audiencia registrados para esta aplicación. No reutilizar la identidad de desarrollo. |
-| `OIDC_SCOPE` | Debe incluir `openid`, `quotes:read` y `quotes:write`, concedidos efectivamente por el proveedor. |
-| URL de retorno OIDC | Registrar el origen real seguido de `/auth/callback`, conforme al proveedor. |
-| `OIDC_ALLOW_LOCAL_HTTP` | `false`. Producción exige HTTPS para la identidad. |
-| `SESSION_SECRET` | 32 bytes generados criptográficamente y codificados en 64 caracteres hexadecimales. Conservar de forma segura si se requiere recuperar estado de sesión cifrado. |
-| `INTEGRATION_SERVICE_KEY` | Clave aleatoria independiente, entre 32 y 256 caracteres ASCII sin espacios, compartida solo entre los servidores que la necesitan. |
-| `RUC_PROVIDER`, `RUC_API_TOKEN` | Para verificación RUC real, Decolecta y una credencial nueva, válida y privada, sin prefijo `Bearer`. |
-| `API_BACKEND`, URLs internas | Compose selecciona .NET y los nombres de servicio internos. No enviar esas credenciales al navegador ni publicar las API internas. |
-| Datos y condiciones del negocio | Identidad legal, contactos, precios, impuestos, disponibilidad, políticas y derechos de imágenes confirmados por su responsable. |
+| `APP_ORIGIN` | Origen HTTPS exacto, sin ruta, usuario ni parámetros |
+| `OIDC_PROVIDER` | `google`, perfil predeterminado de la definición IaC |
+| `OIDC_ISSUER` | `https://accounts.google.com` para Google |
+| `OIDC_CLIENT_ID`, `OIDC_AUDIENCE` | Mismo identificador completo del cliente OAuth web de Google |
+| `OIDC_CLIENT_SECRET` | Secreto del cliente confidencial, conservado en la web |
+| `OIDC_SCOPE` | `openid profile email` para Google |
+| Callback | Origen efectivo seguido exactamente de `/auth/callback` |
+| `OIDC_ALLOW_LOCAL_HTTP` | `false` en producción |
+| `SESSION_SECRET` | 32 bytes aleatorios codificados como 64 caracteres hexadecimales |
+| `INTEGRATION_SERVICE_KEY` | Clave aleatoria independiente de 32 a 256 caracteres ASCII sin espacios |
+| `RUC_PROVIDER`, `RUC_API_TOKEN` | Decolecta y una credencial nueva y vigente, conservada exclusivamente en Python |
+| `RUC_DAILY_LIMIT` | Entero de 1 a 100000, predeterminado 500 |
+| `RUC_QUOTA_PATH` | Ruta absoluta `/app/data/ruc-quota.sqlite` dentro del volumen Python |
+| Identidad comercial y condiciones | Datos, precios, disponibilidad, políticas y derechos confirmados por el responsable |
 
-La credencial RUC anterior no se importa ni se considera vigente. Si se compartió en chat o con terceros, debe revocarse o rotarse. La consulta real de esta versión sigue pendiente de una credencial nueva y una prueba autorizada del proveedor. Las pruebas demo no verifican datos en SUNAT. El recorrido DNI no consulta RUC, pero la definición IaC actual fija `RUC_PROVIDER=decolecta` y Python requiere un token para arrancar; desplegar con RUC deshabilitado exige cambiar expresamente esa configuración y volver a validarla.
+[GOOGLE.md](GOOGLE.md) explica el registro del cliente web y sus pruebas de aceptación. Google valida la identidad y E&A Cotiza asigna los permisos internos para el historial propio. Para otro proveedor, `OIDC_PROVIDER=standard` requiere los scopes `openid profile email quotes:read quotes:write` y un access token RS256 con la audiencia del API. [AUTENTICACION.md](AUTENTICACION.md) describe ambos perfiles.
 
-El proveedor OIDC debe admitir un cliente confidencial con código y PKCE y emitir tokens de acceso **RS256** con los scopes necesarios. Confirma emisor, audiencia, expiración y separación de sujetos usando dos cuentas reales de prueba antes de habilitar acceso al público. No concedas permisos basándote únicamente en la apariencia del inicio de sesión. Para Railway, reservar primero el dominio HTTPS del servicio `web` vacío permite cerrar `APP_ORIGIN` y `/auth/callback` antes del plan final; seguir la secuencia de [RAILWAY.md](RAILWAY.md).
+La definición IaC fija `RUC_PROVIDER=decolecta` y el servicio exige una credencial vigente al arrancar. El contador reserva cada intento antes del envío, incluidos los que terminan con error. La caché y las solicitudes concurrentes agrupadas evitan llamadas adicionales durante su vigencia. El modo local de demostración permite verificar el recorrido con datos ficticios y la aceptación del proveedor real queda pendiente.
 
-## Proxy y límites
+El proxy del destino debe conservar el origen público y servir TLS válido. Las respuestas de página incluyen CSP con nonce por petición y las respuestas de producción cubiertas por el proxy de Next incluyen HSTS de 63072000 segundos al usar origen HTTPS. Comprueba también las cabeceras efectivas del CDN o proxy y los recursos estáticos. Las cookies de sesión HTTPS usan `Secure`, `HttpOnly`, `SameSite=Lax` y prefijo `__Host-`.
 
-Configura TLS válido, renovación del certificado, cabeceras de seguridad y límites de petición/tiempo en el proxy. Debe poder servir el bundle Next.js y su flujo OIDC manteniendo el origen público configurado. Las cookies de sesión con origen HTTPS usan `Secure`, `HttpOnly`, `SameSite=Lax` y prefijo `__Host-`.
+`TRUSTED_CLIENT_IP_HEADER` parte vacío. Se configura cuando se compruebe que el proxy elimina y reemplaza la cabecera que puede suministrar un cliente y que el servicio carece de una vía pública alternativa hacia la web. El ajuste y su prueba con distintas direcciones siguen pendientes en Railway. Los límites por instancia y el uso de SQLite corresponden a una réplica por servicio y requieren revisar la arquitectura antes de aumentar réplicas.
 
-`TRUSTED_CLIENT_IP_HEADER` está vacío por defecto. Solo debe configurarse a una opción admitida cuando el proxy elimine y reemplace las copias que envía el cliente. El servicio web no debe tener una vía pública que evite ese proxy. Los controles y umbrales concretos están en [MEJORAS-WEB.md](MEJORAS-WEB.md) y [SEGURIDAD-V2.md](SEGURIDAD-V2.md).
+La puesta en servicio se acepta con esta secuencia.
 
-Los topes globales pueden ser consumidos por un atacante y afectar temporalmente a otros usuarios. Los contadores en memoria y la caché RUC son por instancia; no constituyen un límite distribuido. El paquete no define por sí solo la capacidad de memoria/CPU que necesita el alojamiento. Dimensiona y configura recursos del contenedor/proxy según mediciones del destino. Para varias réplicas se requieren un almacén compartido, otra estrategia de persistencia y nuevas pruebas de carga y aislamiento.
+1. Obtener la aprobación del propietario para publicar esta versión, identificar su commit y revisar las ejecuciones de calidad, contenedores e infraestructura de ese commit.
+2. Confirmar los datos del negocio, privacidad, términos, presupuesto efectivo, cuenta, región y entorno de destino.
+3. Reservar el origen HTTPS y registrar el callback de Google. Introducir las claves privadas en el gestor del alojamiento.
+4. Ejecutar `python scripts/preflight.py --env-file .env` y, para Compose, `docker compose --env-file .env config --quiet`. Revisar después el plan IaC del entorno con los tres servicios y tres volúmenes antes de aplicarlo.
+5. Construir y arrancar los servicios en el entorno elegido. Comprobar salud, DNS privado, comunicación interna, cabeceras, cookies y HTTPS público.
+6. Con dos cuentas reales de prueba, verificar inicio y cierre de sesión, caducidad, permisos, guardado, paginación, reapertura y aislamiento del historial.
+7. Recorrer DNI y RUC con credencial vigente, PEN/USD, recojo o locación, importes, IGV, anticipo, saldo y PDF normal y extenso usando datos ficticios.
+8. Medir latencia, errores y consumo en el destino dentro del presupuesto y comprobar los rechazos HTTP 429.
+9. Activar la copia fuera del volumen y ensayar la restauración a una ruta nueva con datos sintéticos. Reiniciar los servicios y comprobar persistencia, incluida la cuota RUC.
+10. Registrar versión, responsable, resultados de aceptación, recuperación y procedimiento de reversión.
 
-## Secuencia de verificación antes de publicar
+El preflight comprueba la configuración de forma estática. DNS, certificados, credenciales, políticas del proveedor y comportamiento del alojamiento se verifican durante los recorridos del destino.
 
-1. Conservar una versión identificable del código y sus archivos de bloqueo. Comprobar los resultados reales de los tres workflows del repositorio publicado y exigir aprobación del commit que se vaya a desplegar.
-2. Revisar la identidad, precios y condiciones comerciales referenciales; completar únicamente los datos confirmados por el negocio.
-3. Preparar secretos nuevos, OIDC real, origen HTTPS, dominio, proxy, volúmenes y permisos. No llevar el emisor de desarrollo al servidor público.
-4. Ejecutar el preflight y validar la estructura efectiva de Compose, sin imprimir la configuración con secretos:
+El trabajador .NET comprueba al arrancar y cada hora si corresponde crear una copia de la base de cotizaciones. Usa la API online SQLite, comprueba integridad, genera metadatos y conserva las siete copias completas válidas más recientes con intervalo mínimo de 24 horas. Las copias quedan junto a la base en el mismo volumen. [OPERACIONES.md](OPERACIONES.md) documenta SHA-256, recuperación mediante Python y las bases adicionales que el operador debe respaldar.
 
-   ```powershell
-   python scripts/preflight.py --env-file .env
-   docker compose --env-file .env config --quiet
-   ```
+Antes de cambiar versión, conserva un artefacto identificable y respaldos verificados. Para revertir, detén las escrituras y selecciona el artefacto previo con una base compatible. Restaura los datos a una ruta nueva, comprueba contenido e integridad y configura explícitamente `DATABASE_PATH` al reiniciar. La recuperación del estado cifrado de sesión requiere el mismo `SESSION_SECRET`. Las sesiones caducadas conservan esa caducidad y una rotación de clave obliga a iniciar sesión de nuevo.
 
-5. En un entorno de prueba del destino, construir y arrancar las imágenes mediante el procedimiento operativo elegido. Confirmar estado de servicios, `/api/health`, catálogo, formulario y cabeceras. Una validación de configuración no sustituye este arranque.
-6. Con dos usuarios de prueba diferentes, verificar inicio/cierre de sesión, scopes, rechazo de solicitudes sin autorización, escritura, lectura y ausencia de presupuestos ajenos en cada historial. Revisar también CSRF y expiración de sesión.
-7. Ejecutar el recorrido DNI, RUC autorizado con credencial nueva, moneda PEN/USD, recojo/entrega, importes, anticipo/saldo, guardado y reapertura. Descargar y revisar un PDF normal y otro con textos largos; conservar evidencias sintéticas.
-8. Medir latencia y errores con la carga esperada del alojamiento, ajustar recursos y límites y comprobar el comportamiento de HTTP 429. Las pruebas locales no determinan la capacidad del servidor.
-9. Crear un respaldo, verificarlo y restaurarlo a una ruta nueva; comprobar datos y permisos con la aplicación antes de aceptar la política de recuperación.
-10. Publicar únicamente después de resolver los fallos y registrar versión, responsable, configuración operativa y procedimiento de reversión.
-
-El preflight es estático y no usa la red. Un resultado aprobado no acredita la resolución DNS, el certificado, credenciales válidas, disponibilidad ni los permisos externos. Los resultados reales de los pasos pendientes deben añadirse al registro del despliegue, sin secretos.
-
-## Respaldo, recuperación y reversión
-
-Cada base requiere una copia consistente con la API de respaldo SQLite. No copies únicamente el archivo principal de una base activa mientras pueda haber cambios en WAL. [OPERACIONES.md](OPERACIONES.md) contiene los comandos de respaldo, verificación SHA-256/integridad y restauración que solo crea rutas nuevas.
-
-Protege los volúmenes y respaldos mediante controles del alojamiento y una política de retención. Las cotizaciones no tienen cifrado de aplicación. SHA-256 detecta cambios respecto al metadato conservado, pero no es una firma si un tercero puede cambiar ambos. Los respaldos se realizan por base; no constituyen una transacción coordinada entre los servicios ni incluyen borradores que permanecen solo en el navegador.
-
-Antes de cambiar versión, identifica el artefacto anterior y conserva respaldos verificados. Para revertir, detén las escrituras y recupera el artefacto previo con una base compatible. Si se necesita recuperar datos, restaura a una ruta nueva, verifica su contenido y selecciona explícitamente esa ruta al reiniciar. Conserva el archivo anterior para poder regresar a él. No sobrescribas la base activa ni supongas que una versión anterior admite cualquier cambio de esquema.
-
-La recuperación de estado cifrado de sesión requiere el mismo `SESSION_SECRET`; las sesiones ya caducadas siguen caducadas. Rotar esa clave invalida las sesiones anteriores y obliga a iniciar sesión nuevamente. La política de rotación y retención debe preverlo.
-
-## Límites conocidos que debe revisar el operador
-
-El historial devuelve las últimas 200 cotizaciones y puede generar respuestas grandes. Una fila histórica corrupta puede impedir cargarlo; paginación y recuperación por registro continúan pendientes. Los límites por instancia y los topes globales requieren dimensionamiento. No se incluyen pagos, facturación electrónica, automatización de respaldos ni una migración de los datos anteriores.
-
-Esta documentación prepara un despliegue revisable. La certificación externa, disponibilidad, conformidad comercial y aceptación operativa del entorno necesitan sus comprobaciones propias; no se deducen del éxito de los tests locales.
+Los textos comerciales de Dulce Atelier y los precios de muestra requieren confirmación del responsable. La copia externa, Google y Decolecta reales, las condiciones legales, el control de IP del proxy y la recuperación en Railway conservan sus pruebas de aceptación pendientes. El acta local registra el estado de cada punto de auditoría y sus evidencias.

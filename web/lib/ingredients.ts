@@ -1,4 +1,4 @@
-import {z} from 'zod';
+import {z} from './zod';
 import type {Quote} from './quote';
 export type IngredientGroup={id:string;label:string;options:readonly string[]};
 export type IngredientDefinition={name:string;intro:string;groups:IngredientGroup[]};

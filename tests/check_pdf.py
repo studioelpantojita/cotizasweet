@@ -10,10 +10,16 @@ for path in (root/'pdf').glob('*.pdf'):
     with pdfplumber.open(path) as pdf:
         bad=[]
         for i,page in enumerate(pdf.pages):
+            signature=[curve for curve in page.curves
+                       if 43 <= curve['x0'] < curve['x1'] <= 168 and 807 <= curve['top'] <= curve['bottom'] <= 832]
+            assert signature and max(curve['x1'] for curve in signature)-min(curve['x0'] for curve in signature)>110, (
+                path.name, i+1, 'Falta la firma vectorial E&A Cotiza en el pie'
+            )
             for c in page.chars:
                 if c['x0'] < 40 or c['x1'] > 559 or c['top'] < 5 or c['bottom'] > 833:
                     bad.append({'page':i+1,'text':c['text'],'box':[c['x0'],c['top'],c['x1'],c['bottom']]})
         text='\n'.join(p.extract_text() or '' for p in pdf.pages)
+        assert 'Dulce Atelier' in text and 'IDENTIDAD REFERENCIAL' in text, path.name
         if path.stem=='long_description':
             # Se conservan las 149 líneas X de la descripción, además de la X del teléfono referencial.
             description_x=sum(line.strip()=='X' or line.strip() in ('PAS-002 X','CONT. X') for line in text.splitlines())

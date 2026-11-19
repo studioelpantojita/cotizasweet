@@ -3,9 +3,13 @@ import asyncio
 import datetime as dt
 import hmac
 import json
+import math
 import os
+import re
+import sqlite3
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, closing
+from pathlib import Path
 import httpx
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
@@ -23,6 +27,50 @@ _lock=asyncio.Lock()
 _requests=[]
 _inflight={}
 MAX_INFLIGHT=4
+LIMA = dt.timezone(dt.timedelta(hours=-5), 'America/Lima')
+
+
+def _quota_limit():
+    value = os.getenv('RUC_DAILY_LIMIT', '500')
+    if not re.fullmatch(r'[0-9]{1,6}', value) or not 1 <= int(value) <= 100_000:
+        raise RuntimeError('RUC_DAILY_LIMIT debe ser un entero entre 1 y 100000.')
+    return int(value)
+
+
+def _quota_path():
+    configured = os.getenv('RUC_QUOTA_PATH', '')
+    if configured:
+        path = Path(configured)
+        if path.is_absolute():
+            return path
+        raise RuntimeError('RUC_QUOTA_PATH debe ser una ruta absoluta.')
+    if os.getenv('APP_ENV') == 'development':
+        root = Path(__file__).resolve().parents[1] / 'data'
+        root.mkdir(exist_ok=True, mode=0o700)
+        return root / 'ruc-quota.sqlite'
+    raise RuntimeError('Configura RUC_QUOTA_PATH en el volumen persistente del servicio RUC.')
+
+
+def _reserve_paid_lookup(now=None):
+    """Reserve before the request since a failed response may still be billed."""
+    local_now = (now or dt.datetime.now(dt.timezone.utc)).astimezone(LIMA)
+    day = local_now.date()
+    limit = _quota_limit()
+    try:
+        with closing(sqlite3.connect(_quota_path(), timeout=2, autocommit=True)) as connection:
+            connection.execute('CREATE TABLE IF NOT EXISTS paid_ruc_quota (day TEXT PRIMARY KEY, used INTEGER NOT NULL)')
+            update = connection.execute(
+                'INSERT INTO paid_ruc_quota (day, used) VALUES (?, 1) '
+                'ON CONFLICT(day) DO UPDATE SET used = used + 1 WHERE used < ?',
+                (day.isoformat(), limit),
+            )
+            if update.rowcount == 1:
+                return
+    except (sqlite3.Error, OSError, RuntimeError, ValueError):
+        raise LookupError(503, 'No se pudo verificar la cuota de consultas RUC. Intenta más tarde.') from None
+    midnight = dt.datetime.combine(day + dt.timedelta(days=1), dt.time.min, tzinfo=LIMA)
+    retry_after = max(1, math.ceil((midnight - local_now).total_seconds()))
+    raise LookupError(429, 'Se alcanzó la cuota diaria de consultas RUC. Vuelve a intentarlo después de medianoche en Perú.', retry_after)
 
 def validate_configuration():
     """Reject an unsafe deployment before accepting requests; never log values."""
@@ -32,6 +80,9 @@ def validate_configuration():
     provider=os.getenv('RUC_PROVIDER','disabled')
     if provider not in ('disabled','demo','decolecta'):
         raise RuntimeError('RUC_PROVIDER debe ser disabled, demo o decolecta.')
+    _quota_limit()
+    if provider=='decolecta':
+        _quota_path()
     if os.getenv('APP_ENV')!='development':
         if provider=='demo':
             raise RuntimeError('El proveedor de demostración solo está permitido en desarrollo.')
@@ -61,6 +112,7 @@ async def _fetch_ruc(ruc, provider):
         raise LookupError(503,'La consulta RUC requiere configurar el proveedor Decolecta.')
     token=os.getenv('RUC_API_TOKEN','')
     if not token: raise LookupError(503,'Falta configurar la credencial del proveedor RUC en el servidor.')
+    await asyncio.to_thread(_reserve_paid_lookup)
     try:
         async with asyncio.timeout(10):
             async with httpx.AsyncClient(timeout=8,follow_redirects=False,trust_env=False) as client:
@@ -136,7 +188,7 @@ async def lifespan(app):
     for task in pending: task.cancel()
     if pending: await asyncio.gather(*pending,return_exceptions=True)
 
-app=FastAPI(title='CotizaSweet · Resolución RUC',version='2.1.0',docs_url=None,redoc_url=None,lifespan=lifespan)
+app=FastAPI(title='E&A Cotiza · Resolución RUC',version='2.2.0',docs_url=None,redoc_url=None,lifespan=lifespan)
 @app.middleware('http')
 async def no_store(request,call_next):
     response=await call_next(request)

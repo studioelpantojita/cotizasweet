@@ -3,6 +3,7 @@ import {mkdirSync, chmodSync} from 'node:fs';
 import {resolve, dirname} from 'node:path';
 import {createHash, createCipheriv, createDecipheriv, randomBytes, randomUUID} from 'node:crypto';
 import {totals, type Quote, type SavedQuote} from '@/lib/quote';
+import {encodeHistoryCursor, historyPageSize, historyPayloadLimit, parseStoredHistoryPayload, type HistoryCursor, type StoredHistoryPage} from './history-page';
 
 let connection: DatabaseSync | undefined;
 export function db() {
@@ -16,7 +17,7 @@ export function db() {
       CREATE TABLE IF NOT EXISTS quotes (id TEXT PRIMARY KEY, owner TEXT NOT NULL, payload TEXT NOT NULL, total_cents INTEGER NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS request_limits (bucket TEXT PRIMARY KEY, hits INTEGER NOT NULL, reset_at INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS request_limits_expiry ON request_limits(reset_at);
-      CREATE INDEX IF NOT EXISTS quotes_owner ON quotes(owner,created_at DESC);`);
+      CREATE INDEX IF NOT EXISTS quotes_owner_history ON quotes(owner,created_at DESC,id DESC);`);
   }
   return connection;
 }
@@ -52,8 +53,25 @@ export function readState<T>(id:string,kind:string,consume=false):T|null {
   try{return unseal<T>(String(row.payload));}catch{return null;}
 }
 export function deleteState(id:string) { db().prepare('DELETE FROM secure_state WHERE id=?').run(digest(id)); }
-export function listQuotes(owner:string):SavedQuote[] {
-  return db().prepare('SELECT * FROM quotes WHERE owner=? ORDER BY created_at DESC, id DESC LIMIT 200').all(owner).map(r=>({id:String(r.id),quote:JSON.parse(String(r.payload)),totalCents:Number(r.total_cents),createdAt:String(r.created_at)}));
+export function listQuotes(owner: string, cursor: HistoryCursor | null = null): StoredHistoryPage {
+  const condition = cursor ? ' AND (created_at,id) < (?,?)' : '';
+  const params = cursor ? [owner, cursor.createdAt, cursor.id] : [owner];
+  const rows = db().prepare(`
+    SELECT id, created_at,
+      CASE WHEN typeof(total_cents)='integer' AND total_cents BETWEEN 0 AND 9007199254740991 THEN total_cents END AS total_cents,
+      CASE WHEN length(CAST(payload AS BLOB)) <= ? THEN payload END AS payload
+    FROM quotes
+    WHERE owner=?${condition}
+    ORDER BY created_at DESC, id DESC LIMIT ?
+  `).all(historyPayloadLimit, ...params, historyPageSize + 1);
+  const quotes = rows.slice(0, historyPageSize).map(row => ({
+    id: String(row.id),
+    quote: parseStoredHistoryPayload(row.payload),
+    totalCents: typeof row.total_cents === 'number' ? row.total_cents : null,
+    createdAt: String(row.created_at),
+  }));
+  const nextCursor = rows.length > historyPageSize ? encodeHistoryCursor(quotes[quotes.length - 1]) : null;
+  return { quotes, nextCursor };
 }
 export function saveQuote(owner:string,quote:Quote):SavedQuote {
   const record={id:randomUUID(),quote,totalCents:totals(quote).total,createdAt:new Date().toISOString()};

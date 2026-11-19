@@ -1,5 +1,8 @@
 """Offline security and concurrency regression checks; no provider credentials."""
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import datetime as dt
+import sqlite3
 import sys
 import time
 from pathlib import Path
@@ -13,11 +16,13 @@ sys.path.insert(0,str(ROOT/'api-python'))
 import ruc_service as service
 
 @pytest.fixture(autouse=True)
-def isolated(monkeypatch):
+def isolated(monkeypatch,tmp_path):
     monkeypatch.setenv('APP_ENV','development')
     monkeypatch.setenv('RUC_PROVIDER','demo')
     monkeypatch.setenv('INTEGRATION_SERVICE_KEY','x'*48)
     monkeypatch.delenv('RUC_API_TOKEN',raising=False)
+    monkeypatch.delenv('RUC_DAILY_LIMIT',raising=False)
+    monkeypatch.setenv('RUC_QUOTA_PATH',str(tmp_path/'ruc-quota.sqlite'))
     monkeypatch.delenv('OIDC_ALLOW_LOCAL_HTTP',raising=False)
     monkeypatch.setattr(service,'_cache',{})
     monkeypatch.setattr(service,'_inflight',{})
@@ -41,6 +46,10 @@ def result(document):
     {'APP_ENV':'production','RUC_PROVIDER':'demo'},
     {'APP_ENV':'production','RUC_PROVIDER':'disabled','OIDC_ALLOW_LOCAL_HTTP':'true'},
     {'APP_ENV':'production','RUC_PROVIDER':'decolecta'},
+    {'APP_ENV':'production','RUC_PROVIDER':'decolecta','RUC_API_TOKEN':'synthetic','RUC_QUOTA_PATH':''},
+    {'APP_ENV':'production','RUC_PROVIDER':'decolecta','RUC_API_TOKEN':'synthetic','RUC_QUOTA_PATH':'data/quota.sqlite'},
+    {'RUC_DAILY_LIMIT':'0'},
+    {'RUC_DAILY_LIMIT':'500.5'},
 ])
 def test_unsafe_configuration_rejected(monkeypatch,patch):
     for key,value in patch.items(): monkeypatch.setenv(key,value)
@@ -154,3 +163,80 @@ def test_upstream_errors_are_bounded_and_sanitized(monkeypatch,status,body):
     assert error.value.status==503
     assert 'private-example' not in str(error.value)
     assert service._inflight=={} and service._cache=={}
+
+
+def test_paid_quota_is_atomic_across_connections_and_resets_at_lima_midnight(monkeypatch):
+    monkeypatch.setenv('RUC_DAILY_LIMIT', '5')
+    before = dt.datetime(2026, 11, 13, 4, 59, 12, 500000, dt.timezone.utc)
+
+    def take(_index):
+        try:
+            service._reserve_paid_lookup(before)
+            return 200
+        except service.LookupError as error:
+            assert error.retry_after == 48
+            return error.status
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(take, range(20)))
+    assert results.count(200) == 5 and results.count(429) == 15
+    # New connections still see the persistent count until midnight in Peru.
+    assert take(99) == 429
+    service._reserve_paid_lookup(before.replace(hour=5, minute=0, second=0))
+    with sqlite3.connect(service._quota_path()) as connection:
+        assert connection.execute('SELECT day, used FROM paid_ruc_quota ORDER BY day').fetchall() == [('2026-11-12',5),('2026-11-13',1)]
+
+
+def test_paid_lookup_charges_one_attempt_for_merge_and_cache(monkeypatch):
+    monkeypatch.setenv('RUC_PROVIDER','decolecta')
+    monkeypatch.setenv('RUC_API_TOKEN','isolated-test-value')
+    monkeypatch.setenv('RUC_DAILY_LIMIT','1')
+    client_class = httpx.AsyncClient
+    calls = []
+
+    async def upstream(request):
+        document = request.url.params['numero']
+        calls.append(document)
+        await asyncio.sleep(.01)
+        return httpx.Response(200,json={'ruc':document,'legalName':'Identidad sintética'})
+
+    transport = httpx.MockTransport(upstream)
+    monkeypatch.setattr(service.httpx,'AsyncClient',lambda **kwargs:client_class(transport=transport,**kwargs))
+
+    async def scenario():
+        await asyncio.gather(*(service.lookup_ruc(ruc(1)) for _ in range(8)))
+        assert (await service.lookup_ruc(ruc(1)))['legalName']=='Identidad sintética'
+        with pytest.raises(service.LookupError) as error:
+            await service.lookup_ruc(ruc(2))
+        assert error.value.status==429 and 1<=error.value.retry_after<=86400
+
+    asyncio.run(scenario())
+    assert calls == [ruc(1)]
+
+
+def test_paid_provider_failure_still_reserves_quota_and_storage_failure_blocks_provider(monkeypatch,tmp_path):
+    monkeypatch.setenv('RUC_PROVIDER','decolecta')
+    monkeypatch.setenv('RUC_API_TOKEN','isolated-test-value')
+    monkeypatch.setenv('RUC_DAILY_LIMIT','1')
+    client_class = httpx.AsyncClient
+    calls = []
+
+    def upstream(request):
+        calls.append(request.url.params['numero'])
+        return httpx.Response(502)
+
+    transport = httpx.MockTransport(upstream)
+    monkeypatch.setattr(service.httpx,'AsyncClient',lambda **kwargs:client_class(transport=transport,**kwargs))
+
+    async def scenario():
+        for document,status in [(ruc(1),503),(ruc(2),429)]:
+            with pytest.raises(service.LookupError) as error:
+                await service.lookup_ruc(document)
+            assert error.value.status==status
+        monkeypatch.setenv('RUC_QUOTA_PATH',str(tmp_path/'missing-parent'/'quota.sqlite'))
+        with pytest.raises(service.LookupError) as error:
+            await service.lookup_ruc(ruc(3))
+        assert error.value.status==503
+
+    asyncio.run(scenario())
+    assert calls == [ruc(1)]

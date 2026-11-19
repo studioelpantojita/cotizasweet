@@ -1,82 +1,80 @@
-# CotizaSweet 2.1.0
+# E&A Cotiza 2.2.0
 
-Upgrade publicado en el repositorio público personal [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet), conservado en una copia independiente de la versión 2.0.0. Incluye red privada permitida explícitamente, tres imágenes Docker con preparación segura de volúmenes y proceso final sin privilegios, infraestructura Railway versionada y workflows de compilación y smoke de contenedores Linux.
+![E&A Cotiza](web/public/brand/eacotiza-horizontal-granate.svg)
 
-Consulta [la guía Railway](docs/RAILWAY.md), [el estado del upgrade](docs/UPGRADE-2.1.md) y las [ejecuciones de GitHub Actions](https://github.com/studioelpantojita/cotizasweet/actions). El acta de v2 enlazada más abajo corresponde a la base 2.0.0; las ejecuciones de 2.1.0 se identifican por separado y no acreditan un despliegue público de la aplicación.
+Plataforma de cotización de pastelería del proyecto CotizaSweet, con Next.js/TypeScript, ASP.NET Core .NET 10 y Python 3.12. Permite consultar el catálogo, preparar propuestas, generar PDF y conservar un historial por cuenta. Esta versión incorpora la marca E&A Cotiza y los cambios derivados del informe técnico del 13 de noviembre de 2026.
 
-Versión independiente del 10 de noviembre de 2026. Integra Next.js/TypeScript, ASP.NET Core .NET 10 y Python 3.12 para preparar cotizaciones de pastelería, consultar el catálogo, generar PDF y conservar un historial privado por cuenta.
+Esta entrega 2.2.0 se prepara y valida localmente. Su publicación en el repositorio personal [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet) queda pendiente de la aprobación expresa del propietario. Las comprobaciones de esta entrega deben vincularse a la copia o commit y a sus artefactos. Los resultados anteriores están documentados en [VALIDACION-V2.md](docs/VALIDACION-V2.md) y [UPGRADE-2.1.md](docs/UPGRADE-2.1.md), como antecedentes de sus respectivas versiones.
 
-Esta entrega parte del código de CotizaSweet_micropp y conserva su copia anterior. No importa su historial, bases, sesiones ni credenciales. No presupone servicios activos ni una consulta RUC real configurada. El análisis, las pruebas y sus límites se registran en el [acta de validación de la versión 2](docs/VALIDACION-V2.md). Es evidencia técnica local; no equivale a una certificación externa ni acredita un despliegue público.
+## Cambios de 2.2.0
 
-## Cambios de esta versión
+- Marca vectorial en cabeceras, pie, catálogo y PDF, tipografía local DM Sans y favicon específico de 16 × 16 px. La identidad referencial del negocio en la cotización sigue identificada como **Dulce Atelier** y datos de muestra.
+- Historial con páginas de 20 y cursor estable en los tres backends. Cada fila se valida por separado y los registros de versiones anteriores se identifican para que puedan revisarse conservando las propuestas compatibles.
+- Consulta RUC con guardia de origen del navegador, caché, agrupación de solicitudes concurrentes y cuota diaria persistente. El límite predeterminado de 500 reservas de consulta se cuenta por día de Perú y antes de contactar a Decolecta, incluidos los intentos que terminen con error.
+- CSP con nonce por respuesta y HSTS, junto con las defensas de cookies, origen, permisos y aislamiento del historial. El perfil de inicio de sesión Google está documentado en [GOOGLE.md](docs/GOOGLE.md).
+- Respaldo automático de la base de cotizaciones .NET cada 24 horas, con comprobación horaria, integridad SQLite y conservación de las siete copias completas más recientes.
+- Infraestructura Railway actualizada a **tres servicios y tres volúmenes**, incluido el contador persistente de cuota RUC. La definición selecciona Google como perfil OIDC predeterminado.
 
-- Actualización de dependencias identificadas en la revisión, incluida la migración a Zod 4 y su exportador nativo de contratos JSON Schema. Los archivos de bloqueo forman parte de la entrega.
-- Validación estricta y coherente de solicitudes, tamaño, codificación y campos admitidos, con regresión de las reglas financieras en los tres backends.
-- Límites de solicitudes para proteger inicio de sesión, consultas RUC y operaciones de cotización; comunicación de HTTP 429 y esperas de reintento.
-- Consulta RUC con caché acotada, agrupación de solicitudes simultáneas del mismo documento y límites de concurrencia, tiempo y respuesta externa.
-- Conservación del nombre guardado al abrir un presupuesto o borrador RUC. Editar el documento limpia su identidad, y guardar o generar un PDF nuevo mantiene la verificación del servidor.
-- Herramientas de respaldo y restauración SQLite, preflight de producción, comprobación de salud y pruebas de seguridad, finanzas, mutación, navegador y rendimiento local.
-- Integración continua y propuestas de actualización de dependencias activas en GitHub. Las propuestas no se fusionan automáticamente; cada cambio debe superar las comprobaciones y revisarse.
+## Preparar la ejecución local en Windows
 
-El detalle está en [mejoras web](docs/MEJORAS-WEB.md), [seguridad de la versión 2](docs/SEGURIDAD-V2.md), [operaciones](docs/OPERACIONES.md) e [integración continua](docs/CI.md). La documentación de la copia anterior se conserva como [historial de la versión 1](docs/HISTORIAL-v1.md); sus puertos, resultados y configuración no describen esta instalación.
+Instala Node.js 24 o posterior, Python 3.12 o posterior y .NET SDK 10. Comprueba que los ejecutables elegidos resuelvan a esas versiones. Si existen varios Python instalados, pasa la ruta explícita del ejecutable 3.12 en `-PythonPath`.
 
-## Preparación y ejecución local en Windows
-
-Instala Node.js 24 o posterior, Python 3.12 o posterior y .NET SDK 10. Para utilizar F5, Visual Studio debe admitir .NET 10. Abre PowerShell en la raíz de esta aplicación y ejecuta:
+Desde la raíz de esta copia ejecuta lo siguiente.
 
 ```powershell
-.\scripts\setup-local.ps1 -NodePath node -PythonPath python -DotnetPath dotnet
+.\scripts\setup-local.ps1 -NodePath node -PythonPath python -DotnetPath dotnet -InstallBrowsers
 ```
 
-El script comprueba los runtimes, crea `.venv`, instala dependencias, restaura .NET con sus archivos de bloqueo y genera `local.settings.json`. Si tienes varios ejecutables instalados, utiliza sus rutas en los parámetros. No es necesario cambiar políticas de seguridad del sistema. La preparación necesita acceso a los registros de dependencias.
+El script crea el entorno `.venv`, instala dependencias, restaura la solución con los archivos de bloqueo y genera `local.settings.json`. `-InstallBrowsers` instala Chromium para las pruebas automatizadas. Las rutas y los puertos locales quedan en ese archivo privado.
 
-Abre `INICIAR-EN-VISUAL-STUDIO.slnx` en Visual Studio, establece **EA.Cotiza.Local** como proyecto de inicio si se solicita y pulsa **F5**. Para explorar todos los componentes puedes abrir `EA-Cotiza.slnx`. Como alternativa, desde PowerShell:
+Abre **INICIAR-EN-VISUAL-STUDIO.slnx**, elige **EA.Cotiza.Local** como proyecto de inicio y pulsa F5. La solución incluye el lanzador y la API para que ambos proyectos se compilen. Ante un error de compilación, revisa la salida y recompila la solución completa antes de iniciar una nueva instancia.
+
+También puedes ejecutar el lanzador desde PowerShell.
 
 ```powershell
 dotnet run --project launcher/EA.Cotiza.Local.csproj
 ```
 
-Mantén la depuración o la terminal en ejecución mientras utilizas la aplicación. Detén con Mayús+F5 o Ctrl+C. El lanzador indica cuándo están listos los servicios y qué dirección abrir. Abrir una URL por sí sola no inicia la aplicación.
-
-| Componente local | Puerto predeterminado de v2 |
+| Componente local | Puerto predeterminado |
 |---|---:|
 | Interfaz Next.js | 3340 |
 | API .NET | 8340 |
 | Servicio Python RUC | 8341 |
-| Identidad OIDC de desarrollo | 9340 |
+| Identidad local de desarrollo | 9340 |
 
-Con esos puertos, abre `http://127.0.0.1:3340/`, `/catalogo` o `/cotizar`. Si necesitas otros, pasa `-WebPort`, `-ApiPort`, `-RucPort` e `-IdentityPort` al script de preparación. Este conserva los puertos previamente guardados cuando se vuelve a ejecutar sin parámetros de puertos. No inicies dos procesos de esta copia sobre los mismos puertos. Sus archivos locales quedan en `data/` y `logs/`, excluidos del versionado.
+El lanzador indica la dirección efectiva de la aplicación y mantiene los servicios activos hasta detenerlo con Mayús+F5 o Ctrl+C. Los parámetros `-WebPort`, `-ApiPort`, `-RucPort` e `-IdentityPort` permiten asignar puertos diferentes al preparar otra copia. El script conserva los puertos previamente guardados si se vuelve a ejecutar con sus valores predeterminados y sin parámetros de puerto.
 
-### Probar con DNI y configurar RUC
+El acceso local utiliza un emisor efímero de desarrollo y una cuenta sintética. Las sesiones caducan y al reiniciar puede ser necesario entrar de nuevo. Las cotizaciones guardadas permanecen en la base de esta copia. `data/`, `logs/`, `.venv` y la configuración privada se excluyen del control de versiones.
 
-Puedes revisar el formulario y generar un PDF con **Persona Natural**, documento **DNI** y datos sintéticos sin disponer de un token RUC. Completa los campos obligatorios, añade un servicio y un precio explícito, revisa recojo/entrega, moneda, anticipo y total, y utiliza **Ver PDF** o **Descargar cotización PDF**. No se generan precios para las fotografías de la cartera.
+## Revisar una propuesta y configurar RUC
 
-Para guardar el historial, **Iniciar sesión** utiliza una identidad local de desarrollo y una cuenta de prueba compartida. No es una autenticación comercial. Las sesiones son efímeras; las cotizaciones guardadas permanecen en la base local de esta versión. Al reiniciar puede ser necesario iniciar sesión de nuevo.
+Para comprobar el cotizador, elige Persona Natural con DNI y usa datos ficticios. Completa los campos obligatorios, añade servicios con precios explícitos, revisa moneda, recojo o locación, movilidad, IGV, anticipo y saldo y genera el PDF. PEN y USD conservan sus importes sin conversión automática.
 
-La consulta real de RUC requiere una **credencial nueva y vigente**, todavía pendiente para esta copia. El script crea `.env.ruc.local` a partir del ejemplo si no existe; completa allí `RUC_PROVIDER` y `RUC_API_TOKEN` en privado, sin el prefijo `Bearer`. Nunca guardes credenciales en Git, informes, capturas o paquetes. Si la credencial de la versión anterior se compartió en un chat o con terceros, revócala o rótala antes de continuar; no la reutilices por defecto.
+La consulta real de RUC necesita una credencial nueva y vigente de Decolecta. Completa `RUC_PROVIDER`, `RUC_API_TOKEN` y `RUC_DAILY_LIMIT` en `.env.ruc.local`, que el preparador crea desde el ejemplo. Introduce el token en privado y con su valor directo, sin prefijo Bearer. Una credencial que haya quedado expuesta debe revocarse y sustituirse en el proveedor.
 
-Empresa y Persona Natural con RUC completan el nombre mediante el servidor. Si falta la credencial o el proveedor falla, se informa el error y no se inventa una razón social. Las respuestas RUC usadas por las pruebas automáticas son ficticias y se identifican como demostración.
+El servicio conserva el contador en `RUC_QUOTA_PATH`. El lanzador usa `data/ruc-quota.sqlite` y el contenedor monta `/app/data/ruc-quota.sqlite`. La caché evita nuevas reservas durante su vigencia. Los datos de demostración se identifican en pantalla y en el PDF como ficticios.
 
-## Datos y condiciones del cotizador
+## Datos y operación
 
-Se conservan PEN y USD sin conversión automática, anticipo editable, recojo/entrega y compatibilidad de lectura de presupuestos anteriores. Las condiciones vigentes del código —incluidos impuestos, movilidad y vigencia— no constituyen asesoría fiscal ni confirmación comercial. Revisa los valores con el propietario antes del uso real.
+Dulce Atelier, sus contactos, los precios, la disponibilidad, las condiciones y las imágenes siguen siendo referenciales y deben completarse con información confirmada por el responsable. La cuenta del usuario identifica el propietario de cada cotización. El historial puede contener documentos, correo y teléfono que el operador debe incluir en su aviso de privacidad y su política de retención.
 
-La identidad comercial referencial, contactos, precios de muestra, disponibilidad, condiciones, imágenes y derechos de uso requieren confirmación. Las fotografías de la cartera son referencias para definir servicios a medida; no acreditan stock, certificaciones alimentarias ni tarifas. No se incorporan cobros, facturación electrónica o políticas comerciales nuevas.
+El servicio .NET comprueba al iniciar y cada hora si corresponde un respaldo. Cuando han pasado al menos 24 horas desde la última copia completa, crea otra con la API SQLite, verifica integridad y genera metadatos de tamaño y SHA-256. Conserva siete copias completas en `backups/` junto a la base del volumen. Esta retención se expresa en copias y depende de que el servicio esté en ejecución.
 
-El historial muestra las últimas **200 cotizaciones**. Su paginación y la recuperación individual ante una fila histórica corrupta quedan pendientes. Las cotizaciones están en SQLite sin cifrado de aplicación; protege los volúmenes y respaldos. El estado de sesión sí se cifra, con un propósito diferente.
+La copia externa de los respaldos sigue pendiente de configurar en el alojamiento. El operador debe ensayar la restauración a una ruta nueva y documentar periodicidad, retención, permisos y recuperación de los tres volúmenes. Los comandos están en [OPERACIONES.md](docs/OPERACIONES.md).
 
 ## Repetir las comprobaciones
 
-Los comandos siguientes usan datos sintéticos y procesos temporales. El [acta de v2](docs/VALIDACION-V2.md) identifica las ejecuciones efectivamente realizadas, resultados y límites; la [definición de CI](docs/CI.md) contiene la secuencia completa para un checkout limpio. No se declara aprobada una prueba por el simple hecho de incluir su comando.
-
-Después de preparar la aplicación, instala las herramientas de QA desde la raíz:
+Después de preparar el entorno, instala las herramientas de QA y ejecuta la batería de backend, integración y navegador desde la raíz.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-qa.txt
 .\.venv\Scripts\python.exe -m pip check
+.\scripts\test-backend.ps1 -Integration -Browser
 ```
 
-Desde `web/`:
+El script usa las rutas de `local.settings.json` y admite `-PythonPath`, `-NodePath`, `-DotnetPath` y `-BrowserChannel` para elegir ejecutables o navegador. La integración ejecuta perfiles sintéticos `standard` y `google` sobre los tres backends.
+
+Las comprobaciones web se ejecutan desde `web/`.
 
 ```powershell
 npx --no-install next typegen
@@ -88,46 +86,22 @@ npm run test:services:pdf
 npm audit --audit-level=moderate
 ```
 
-`npm test` es el agregador de dominio, catálogo, presentaciones, servicios y seguridad HTTP; no se limita a una sola suite. Para comprobar contratos, ejecuta también `npm run contracts` y `npm run catalog:contracts`, y revisa que los archivos generados en `contracts/` no cambien inesperadamente.
-
-Desde la raíz:
+Desde la raíz se verifican además el catálogo, el PDF, la configuración y las dependencias.
 
 ```powershell
-dotnet build EA-Cotiza.slnx -c Release
-dotnet run --project tests/security_backend/DotnetSecurityChecks.csproj -c Release
-dotnet build tests/v2/dotnet-probe/FinancialProbe.csproj -c Release
-.\.venv\Scripts\python.exe -m pytest tests/security_backend tests/operations tests/dependencies -q
 .\.venv\Scripts\python.exe tests/catalog_test.py
 .\.venv\Scripts\python.exe tests/check_pdf.py
-.\.venv\Scripts\python.exe tests/v2/run_quality.py --node node --dotnet-probe tests/v2/dotnet-probe/bin/Release/net10.0/FinancialProbe.dll
 .\.venv\Scripts\python.exe tests/production_smoke.py
 .\.venv\Scripts\python.exe -m pip_audit -r api-python/requirements.lock.txt --disable-pip --no-deps
 .\.venv\Scripts\python.exe scripts/audit_nuget.py
 ```
 
-Las auditorías consultan sus fuentes de vulnerabilidades; requieren conectividad y su resultado corresponde a ese momento. En CI, .NET restaura con `--locked-mode` y auditoría de dependencias directas/transitivas que trata advertencias como errores. La sonda financiera comprueba paridad, mutaciones dirigidas y durabilidad según [tests/v2/README.md](tests/v2/README.md); su puntuación de mutación no representa todo el repositorio.
+Los informes de ejecución, las capturas y los PDF sintéticos permiten revisar los resultados de cada copia o commit. Las auditorías de dependencias consultan las fuentes de avisos vigentes en el momento de ejecutar. Las pruebas financieras, de mutación, concurrencia y durabilidad se describen en [tests/v2/README.md](tests/v2/README.md). La aceptación del acceso real de Google requiere el cliente registrado y las cuentas del propietario según [GOOGLE.md](docs/GOOGLE.md). El acta debe identificar los controles locales ejecutados, los resultados Docker conservados en la evidencia local y las limitaciones pendientes. La CI remota de 2.2.0 queda pendiente de publicación y ejecución.
 
-Para el recorrido de navegador instala Chromium desde `web/`:
+## Publicación funcional
 
-```powershell
-npx --no-install playwright install chromium
-```
+Railway es el destino preparado para el piloto. Esta entrega permanece local hasta que el propietario apruebe expresamente su publicación en GitHub y la continuación del despliegue. El presupuesto máximo indicado por el propietario es **US$30 mensuales**. La activación de Hobby, los controles de gasto efectivos, el dominio HTTPS, Google real, RUC real y la restauración en el destino siguen pendientes de completar y verificar.
 
-Después, desde la raíz:
+[RAILWAY.md](docs/RAILWAY.md) describe los tres servicios y tres volúmenes, las variables y la secuencia de publicación. [DESPLIEGUE.md](docs/DESPLIEGUE.md) y [OPERACIONES.md](docs/OPERACIONES.md) reúnen los requisitos de operación y reversión. Antes de aplicar infraestructura, revisa el commit, sus comprobaciones y el plan concreto del entorno.
 
-```powershell
-$env:RUN_BROWSER_E2E='1'
-.\.venv\Scripts\python.exe tests/integration.py --backend all
-```
-
-La integración usa puertos y bases de prueba independientes. No depende del token RUC real. El smoke del bundle de producción comprueba rutas públicas y carga local acotada; no acredita autenticación externa ni capacidad del futuro alojamiento.
-
-## Publicación y operación
-
-El código y los workflows están publicados en la cuenta personal. Los resultados verificables se registran en [el estado de 2.1.0](docs/UPGRADE-2.1.md). Railway es el destino elegido para preparar el piloto; falta conectar la cuenta, autorizar el presupuesto y configurar los servicios externos antes del despliegue funcional.
-
-La aplicación necesita servidores para Next.js, .NET y Python, persistencia y autenticación OIDC real. [GitHub Pages publica contenido estático](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages); por ello no ejecuta por sí solo este sistema dinámico. El alojamiento funcional requiere un destino apropiado, como un servidor con contenedores, HTTPS y volúmenes persistentes.
-
-Consulta [despliegue](docs/DESPLIEGUE.md) antes de publicar y [operaciones](docs/OPERACIONES.md) para el preflight y la restauración a una ruta nueva. Los contadores de memoria y la caché RUC se aplican por instancia; varias réplicas requieren un almacén compartido y nuevas pruebas. Los límites globales web pueden agotarse temporalmente y deben complementarse en el proxy. Un respaldo por base no constituye una transacción coordinada entre servicios.
-
-Las tres imágenes y su smoke de arranque/persistencia ya se verificaron en Linux mediante GitHub Actions. TLS público, OIDC comercial, RUC real y la restauración en el alojamiento elegido quedan pendientes de la fase de despliegue.
+La revisión local de esta entrega se documenta en [AUDITORIA-2.2.md](docs/AUDITORIA-2.2.md), con resultados ejecutados, alcance y requisitos externos pendientes. El acceso preparado en este equipo utiliza [REVISION-MANUAL-2.2.md](docs/REVISION-MANUAL-2.2.md).

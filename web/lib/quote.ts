@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from './zod';
 import {showcase} from './sweet-showcase';
 import {pickupAddress} from './pickup-location';
 import {clientDocumentType,isValidRuc} from './identity';

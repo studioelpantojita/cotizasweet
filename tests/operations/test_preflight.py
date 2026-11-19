@@ -26,6 +26,7 @@ def synthetic_configuration():
         'INTEGRATION_SERVICE_KEY': 'SYNTHETIC_INTEGRATION_CREDENTIAL_123',
         'RUC_PROVIDER': 'decolecta',
         'RUC_API_TOKEN': 'SYNTHETIC_RUC_CREDENTIAL_123',
+        'RUC_QUOTA_PATH': '/app/data/ruc-quota.sqlite',
         'API_BACKEND': 'dotnet',
         'API_BASE_URL': 'http://api-dotnet:8000',
         'RUC_SERVICE_URL': 'http://api-python:8000',
@@ -33,6 +34,16 @@ def synthetic_configuration():
 
 
 class PreflightTests(unittest.TestCase):
+    def test_google_profile_checks_issuer_client_audience_and_basic_scopes(self):
+        config={**synthetic_configuration(),'OIDC_PROVIDER':'google','OIDC_ISSUER':'https://accounts.google.com',
+                'OIDC_CLIENT_ID':'123456-synthetic.apps.googleusercontent.com',
+                'OIDC_AUDIENCE':'123456-synthetic.apps.googleusercontent.com','OIDC_SCOPE':'openid profile email'}
+        self.assertEqual(preflight.evaluate(config)['status'],'passed')
+        for key,value in [('OIDC_ISSUER','https://another.production-check.io'),('OIDC_AUDIENCE','other'),
+                          ('OIDC_CLIENT_ID','bad-client'),('OIDC_SCOPE','openid profile email quotes:write')]:
+            with self.subTest(key=key):
+                self.assertEqual(preflight.evaluate({**config,key:value})['status'],'failed')
+
     def test_complete_synthetic_config_passes_without_echoing_credentials(self):
         config = synthetic_configuration()
         result = preflight.evaluate(config)
@@ -55,6 +66,8 @@ class PreflightTests(unittest.TestCase):
             'INTEGRATION_SERVICE_KEY': ['a' * 48, 'short', 'has spaces ' * 4],
             'RUC_PROVIDER': ['demo', 'disabled'],
             'RUC_API_TOKEN': ['', 'Bearer token', 'token with spaces'],
+            'RUC_DAILY_LIMIT': ['', '0', '-9', '100001', '500.5'],
+            'RUC_QUOTA_PATH': ['', 'data/ruc-quota.sqlite'],
             'API_BACKEND': ['invalid', ''],
             'API_BASE_URL': ['http://public.production-check.io', 'http://localhost:8000', 'http://api-dotnet:8000/path'],
             'TRUSTED_CLIENT_IP_HEADER': ['authorization'],

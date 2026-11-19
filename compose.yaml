@@ -7,10 +7,11 @@ services:
       NODE_ENV: production
       APP_ORIGIN: ${APP_ORIGIN}
       OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_PROVIDER: ${OIDC_PROVIDER:-google}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE}
-      OIDC_SCOPE: ${OIDC_SCOPE:-openid profile email quotes:read quotes:write}
+      OIDC_SCOPE: ${OIDC_SCOPE:-openid profile email}
       SESSION_SECRET: ${SESSION_SECRET}
       INTEGRATION_SERVICE_KEY: ${INTEGRATION_SERVICE_KEY}
       API_BACKEND: dotnet
@@ -30,6 +31,8 @@ services:
       APP_ENV: production
       RUC_PROVIDER: ${RUC_PROVIDER:-decolecta}
       RUC_API_TOKEN: ${RUC_API_TOKEN}
+      RUC_DAILY_LIMIT: ${RUC_DAILY_LIMIT:-500}
+      RUC_QUOTA_PATH: /app/data/ruc-quota.sqlite
       INTEGRATION_SERVICE_KEY: ${INTEGRATION_SERVICE_KEY}
       OIDC_ALLOW_LOCAL_HTTP: 'false'
       DATABASE_PATH: /app/data/python.sqlite
@@ -43,6 +46,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_PROVIDER: ${OIDC_PROVIDER:-google}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE}
       INTEGRATION_SERVICE_KEY: ${INTEGRATION_SERVICE_KEY}
       OIDC_ALLOW_LOCAL_HTTP: 'false'

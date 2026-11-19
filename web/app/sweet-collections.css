@@ -28,7 +28,7 @@
 .occasion-family:has(input:focus-visible),.occasion-types label:has(input:focus-visible){outline:2px solid #653746;outline-offset:4px}
 .occasion-family-top{display:flex;justify-content:space-between;align-items:center;color:#9a846c;font-size:10px;letter-spacing:.1em;margin-bottom:22px}
 .occasion-choice-dot{width:15px;height:15px;border:1px solid #c2b39f;border-radius:50%;display:inline-block}
-.occasion-family strong{font:25px/1.12 Georgia,serif;font-weight:400;max-width:185px;color:#554336}
+.occasion-family strong{font:25px/1.12 var(--eacotiza-font);font-weight:400;max-width:185px;color:#554336}
 .occasion-family small{font-size:10px;line-height:1.8;color:#7f705f;margin-top:15px}
 .occasion-family:hover{border-color:#aa8f77}
 .occasion-family.is-selected{background:#603346;border-color:#603346}
@@ -48,7 +48,7 @@
 .has-coffret .occasion-story-image>img{object-fit:contain;padding:45px 30px 70px}
 .occasion-story-copy{padding:48px clamp(28px,4vw,65px);display:flex;flex-direction:column;justify-content:center;min-width:0}
 .occasion-story-copy .sweet-kicker{font-size:9px;color:#885e62;margin-bottom:19px;line-height:1.8}
-.occasion-story-copy h3{font:clamp(32px,3.4vw,51px)/1.08 Georgia,serif;letter-spacing:-.04em;color:#623747;margin:0 0 23px;max-width:430px}
+.occasion-story-copy h3{font:clamp(32px,3.4vw,51px)/1.08 var(--eacotiza-font);letter-spacing:-.04em;color:#623747;margin:0 0 23px;max-width:430px}
 .occasion-story-copy>p:not(.sweet-kicker){font-size:13px;line-height:1.9;color:#745d54;margin:0}
 .occasion-story-detail{border-top:1px solid #d3bfb3;margin-top:26px;padding-top:20px}
 .occasion-story-detail>span{font-size:9px;letter-spacing:.13em;color:#8c6458}
@@ -56,16 +56,16 @@
 .occasion-reference{font-size:9px;color:#856e61;line-height:1.7;margin-top:23px}
 .occasion-offer{display:grid;grid-template-columns:1fr 2fr;gap:65px;padding-block:53px;border-bottom:1px solid #d8cbbc}
 .occasion-offer-intro .sweet-kicker{margin-bottom:17px;font-size:9px}
-.occasion-offer-intro h3{font:34px/1.13 Georgia,serif;letter-spacing:-.03em;color:#554033}
+.occasion-offer-intro h3{font:34px/1.13 var(--eacotiza-font);letter-spacing:-.03em;color:#554033}
 .occasion-offer-intro>p:last-child{font-size:12px;line-height:1.9;color:#7e6a5b;margin-top:18px;max-width:280px}
 .occasion-service-grid{display:grid;grid-template-columns:1fr 1fr;gap:25px 32px}
 .occasion-service-grid article{border-top:1px solid #cdbba6;padding-top:14px}
 .occasion-service-grid article>span{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#8d7258}
-.occasion-service-grid h4{font:22px/1.2 Georgia,serif;color:#5a4237;margin:10px 0}
+.occasion-service-grid h4{font:22px/1.2 var(--eacotiza-font);color:#5a4237;margin:10px 0}
 .occasion-service-grid article>p{font-size:12px;line-height:1.8;color:#7f6d5b}
 .occasion-inspiration{padding-top:48px}
 .occasion-inspiration>div:first-child{text-align:center;margin-bottom:28px}
-.occasion-inspiration h3{font:30px/1.2 Georgia,serif;letter-spacing:-.02em;color:#5b4337}
+.occasion-inspiration h3{font:30px/1.2 var(--eacotiza-font);letter-spacing:-.02em;color:#5b4337}
 .occasion-inspiration>div>p{font-size:11px;line-height:1.8;color:#86705b;margin-top:10px}
 .occasion-inspiration-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;max-width:960px;margin-inline:auto}
 .occasion-inspiration-grid .sweet-piece-image{aspect-ratio:1.12}
@@ -73,10 +73,10 @@
 .occasion-inspiration-grid .sweet-piece-copy p{font-size:11px}
 .occasion-next{display:flex;align-items:center;justify-content:space-between;gap:30px;background:#e9e6da;border:1px solid #d8d0be;margin-top:45px;padding:28px 32px}
 .occasion-next>div>span{display:block;font-size:9px;letter-spacing:.15em;color:#85725d;margin-bottom:8px}
-.occasion-next strong{font:29px/1.2 Georgia,serif;color:#594331}
+.occasion-next strong{font:29px/1.2 var(--eacotiza-font);color:#594331}
 .occasion-next p{font-size:12px;line-height:1.7;color:#7e705c;margin-top:7px}
 .occasion-next .sweet-button{flex-shrink:0}
-.sweet-footer-note p{font:12px/1.9 Arial,sans-serif;color:#847367;margin-top:17px}
+.sweet-footer-note p{font:12px/1.9 var(--eacotiza-font);color:#847367;margin-top:17px}
 .sweet-site .occasion-family strong{overflow-wrap:normal}
 @media(min-width:601px) and (max-width:800px){.sweet-header{gap:18px}.sweet-header nav a{font-size:10px}.sweet-header nav{gap:15px}.sweet-header nav>a:last-of-type{display:none}.sweet-header .sweet-nav-cta{display:flex;font-size:10px;gap:8px;padding:12px}.sweet-header .sweet-wordmark{font-size:25px}}
 @media(max-width:1100px){.sweet-runway-track>li{flex-basis:calc((100% - 58px)/2.7)}.occasion-family{padding:20px 16px}.occasion-family strong{font-size:23px}.occasion-story-copy{padding:35px}.occasion-story,.occasion-story-image{min-height:480px}.occasion-offer{gap:40px}.occasion-service-grid{gap:24px}}

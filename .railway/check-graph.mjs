@@ -10,10 +10,10 @@ const definition=await program(createRailwayContext({environment:'production',co
 assert.equal(definition.name,'cotizasweet');
 const resources=definition.resources.flat();
 assert.equal(resources.filter(r=>r.type==='service').length,3);
-assert.equal(resources.filter(r=>r.type==='volume').length,2);
+assert.equal(resources.filter(r=>r.type==='volume').length,3);
 for(const r of resources.filter(r=>r.type==='service')){
  assert.equal(r.build.builder,'DOCKERFILE');
  assert.equal(r.deploy.numReplicas,1);
  assert.ok(r.deploy.healthcheckPath);
 }
-console.log(JSON.stringify({status:'passed',services:3,volumes:2,replicas_per_service:1,scope:'Offline SDK graph validation; no account, resources or deployment created.'}));
+console.log(JSON.stringify({status:'passed',services:3,volumes:3,replicas_per_service:1,scope:'Offline SDK graph validation; no account, resources or deployment created.'}));

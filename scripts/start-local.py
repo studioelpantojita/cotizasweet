@@ -24,9 +24,10 @@ if private.exists():
     for line in private.read_text(encoding='utf-8-sig').splitlines():
         if '=' in line and not line.lstrip().startswith('#'):
             key,value = line.split('=',1)
-            if key.strip() in ('RUC_PROVIDER','RUC_API_TOKEN'): env[key.strip()] = value.strip().strip('"').strip("'")
+            if key.strip() in ('RUC_PROVIDER','RUC_API_TOKEN','RUC_DAILY_LIMIT'): env[key.strip()] = value.strip().strip('"').strip("'")
 env.update(APP_ENV='development',NODE_ENV='development',ASPNETCORE_ENVIRONMENT='Development',OIDC_ISSUER=urls['identity'],OIDC_AUDIENCE='ea-cotiza-api',OIDC_CLIENT_ID='ea-cotiza-local',OIDC_CLIENT_SECRET=secrets.token_urlsafe(40),SESSION_SECRET=secrets.token_hex(32),OIDC_ALLOW_LOCAL_HTTP='true',APP_ORIGIN=urls['web'],API_BACKEND='dotnet',API_BASE_URL=urls['api'],RUC_SERVICE_URL=urls['ruc'],INTEGRATION_SERVICE_KEY=secrets.token_urlsafe(48),NEXT_TELEMETRY_DISABLED='1',PYTHONUTF8='1',LOCAL_WEB_PORT=str(ports['web']),LOCAL_IDENTITY_PORT=str(ports['identity']))
 env['PYTHONPATH'] = settings.get('pythonModules','')
+env['OIDC_PROVIDER'] = 'standard'
 # Each local web port has independent build files, so parallel previews do not lock each other.
 env['NEXT_DIST_DIR'] = f".next-local-{ports['web']}"
 env['PATH'] = str(Path(settings['node']).parent)+os.pathsep+env.get('PATH','')
@@ -57,7 +58,7 @@ try:
             except OSError: raise RuntimeError(f'El puerto {port} está ocupado. Revisa la instancia anterior o configura otros puertos en local.settings.json.')
     identity = start('identidad-local',[settings['python'],str(ROOT/'scripts/local-identity.py')],ROOT)
     ready(urls['identity']+'/.well-known/openid-configuration',identity)
-    ruc = start('python-ruc',[settings['python'],'-m','uvicorn','ruc_service:app','--host','127.0.0.1','--port',str(ports['ruc']),'--no-access-log'],ROOT/'api-python')
+    ruc = start('python-ruc',[settings['python'],'-m','uvicorn','ruc_service:app','--host','127.0.0.1','--port',str(ports['ruc']),'--no-access-log'],ROOT/'api-python',{'RUC_QUOTA_PATH':str(data/'ruc-quota.sqlite')})
     ready(urls['ruc']+'/health',ruc)
     api = start('dotnet-api',[settings['dotnet'],str(ROOT/f'api-dotnet/bin/{args.configuration}/net10.0/Cotiza.Api.dll')],ROOT/'api-dotnet',{'ASPNETCORE_URLS':urls['api'],'DATABASE_PATH':str(data/'quotes.sqlite')})
     ready(urls['api']+'/health',api)

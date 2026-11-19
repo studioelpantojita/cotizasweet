@@ -1,0 +1,77 @@
+:root,
+.dark {
+  --eacotiza-granate: #581a32;
+  --eacotiza-tinta: #36262c;
+  --eacotiza-crema: #fffaf7;
+  --eacotiza-petalo: #ebc0bf;
+  --eacotiza-font: var(--eacotiza-dm-sans), system-ui, sans-serif;
+  --background: var(--eacotiza-crema);
+  --foreground: var(--eacotiza-tinta);
+  --primary: var(--eacotiza-granate);
+  --rose: var(--eacotiza-petalo);
+}
+
+.sweet-site {
+  --sweet-ink: var(--eacotiza-tinta);
+  --sweet-paper: var(--eacotiza-crema);
+  --sweet-accent: var(--eacotiza-granate);
+}
+
+.sweet-header,
+.studio-nav,
+.sweet-header nav.is-open {
+  background: var(--eacotiza-crema);
+}
+
+.sweet-site .sweet-button,
+.sweet-piece-dialog .sweet-button,
+.sweet-header .sweet-nav-cta {
+  background: var(--eacotiza-granate);
+  border-color: var(--eacotiza-granate);
+  color: #fff;
+}
+
+.sweet-topline {
+  background: var(--eacotiza-petalo);
+  color: var(--eacotiza-tinta);
+}
+
+.sweet-wordmark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 100%;
+}
+
+.eacotiza-mark {
+  /* The clear space is one-quarter of the visible arch height. */
+  --brand-width: clamp(168px, 19vw, 216px);
+  --brand-clearance: calc(var(--brand-width) * .041);
+  display: block;
+  width: calc(var(--brand-width) + 2 * var(--brand-clearance));
+  padding: var(--brand-clearance);
+}
+
+.eacotiza-mark img {
+  display: block;
+  width: var(--brand-width);
+  height: auto;
+}
+
+.eacotiza-mark--compact {
+  --brand-width: 128px;
+  --brand-clearance: calc(var(--brand-width) * .069);
+}
+
+@media (max-width: 299px) {
+  .eacotiza-mark,
+  .eacotiza-mark--compact {
+    --brand-width: 32px;
+    --brand-clearance: calc(var(--brand-width) * .222);
+  }
+}
+
+.paper-footer:has(.eacotiza-mark) {
+  display: flex;
+  justify-content: center;
+}

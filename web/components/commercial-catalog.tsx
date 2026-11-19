@@ -28,7 +28,7 @@ export function ProductCard({product:p,currency,referencePrices}:{product:Catalo
    <div className="catalog-detail-layout">
     <div className="catalog-gallery"><div className="catalog-main-photo"><ProductImage src={p.images[photo].src} alt={p.images[photo].alt}/></div><p className="catalog-photo-caption">{p.images[photo].caption}</p>
      {p.images.length>1&&<div className="catalog-thumbnails" aria-label="Imágenes del producto">{p.images.map((image,i)=><button type="button" key={image.src} aria-label={'Ver imagen '+(i+1)} aria-pressed={photo===i} onClick={()=>setPhoto(i)}><img src={image.src} alt={image.alt}/></button>)}</div>}
-     <span className="catalog-gallery-signature">E&A ATELIER <i>el cuidado está en los detalles</i></span>
+     <span className="catalog-gallery-signature">E&A COTIZA <i>el cuidado está en los detalles</i></span>
     </div>
     <div className="catalog-detail-copy">
      <p className="eyebrow">{p.service==='packs'?'PACKS Y CAJAS':'FICHA DE INSUMOS'}</p>

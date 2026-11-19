@@ -21,6 +21,7 @@ obj/
 .DS_Store
 
 .env.ruc.local
+.local/
 local.settings.json
 .vs/
 .test-data/

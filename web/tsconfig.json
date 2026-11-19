@@ -49,7 +49,9 @@
     ".next-verify-sweet/types/**/*.ts",
     ".next-verify-sweet/dev/types/**/*.ts",
     ".next-local-3340/types/**/*.ts",
-    ".next-local-3340/dev/types/**/*.ts"
+    ".next-local-3340/dev/types/**/*.ts",
+    ".next-local-3350/types/**/*.ts",
+    ".next-local-3350/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

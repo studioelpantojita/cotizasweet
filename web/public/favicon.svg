@@ -1,1 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#581a32"/><text x="16" y="23" text-anchor="middle" fill="#fff5ec" font-size="24" font-family="Georgia">é</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" role="img" aria-labelledby="title">
+  <title id="title">E&amp;A Cotiza · Favicon</title>
+  <g transform="translate(0 0) scale(1)" fill="#581A32" fill-rule="evenodd">
+    <path d="M 2 15 C 1.4 15 1 14.6 1 14 V 8 C 1 4.1 4.1 1 8 1 C 11.9 1 15 4.1 15 8 V 14 C 15 14.6 14.6 15 14 15 Z M 4.15 12.7 C 4.55 10.95 5.45 9.50 6.62 8.25 C 5.05 8.05 4.12 7.14 3.80 5.72 C 5.43 5.64 6.68 6.18 7.42 7.03 C 8.70 5.55 10.33 4.65 12.30 4.48 C 12.26 6.89 10.78 8.65 8.61 8.98 C 7.38 10.09 6.62 11.48 6.20 12.70 Z"/>
+  </g>
+</svg>

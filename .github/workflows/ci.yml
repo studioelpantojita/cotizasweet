@@ -190,3 +190,13 @@ jobs:
             tests/artifacts/browser/desktop.png
             tests/artifacts/browser/mobile.png
             tests/artifacts/browser/pdf-preview.png
+            tests/artifacts/browser-google/results.json
+            tests/artifacts/browser-google/cotizacion-qa.pdf
+            tests/artifacts/browser-google/desktop.png
+            tests/artifacts/browser-google/mobile.png
+            tests/artifacts/browser-google/pdf-preview.png
+            tests/artifacts/production-browser/results.json
+            tests/artifacts/production-browser/cotizacion-qa.pdf
+            tests/artifacts/production-browser/desktop.png
+            tests/artifacts/production-browser/mobile.png
+            tests/artifacts/production-browser/pdf-preview.png

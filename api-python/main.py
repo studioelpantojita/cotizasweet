@@ -1,4 +1,6 @@
 import datetime as dt
+import base64
+import binascii
 import hashlib
 import json
 import os
@@ -23,7 +25,11 @@ from ruc_service import verify_quote_identity, validate_configuration, LookupErr
 
 ISSUER = os.environ.get('OIDC_ISSUER', '')
 AUDIENCE = os.environ.get('OIDC_AUDIENCE', '')
+OIDC_PROVIDER = os.environ.get('OIDC_PROVIDER', 'standard')
 DATABASE = Path(os.environ.get('DATABASE_PATH', './data/python.sqlite'))
+HISTORY_PAGE_SIZE = 20
+HISTORY_PAYLOAD_LIMIT = 131_072
+HISTORY_CURSOR_PATTERN = re.compile(rb'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z\|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 bearer = HTTPBearer(auto_error=False)
 jwks = None
 _rate_buckets={}
@@ -91,7 +97,7 @@ def connection():
 def initialize_database():
     DATABASE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with connection() as db:
-        db.executescript('PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS quotes (id TEXT PRIMARY KEY, owner TEXT NOT NULL, payload TEXT NOT NULL, total_cents INTEGER NOT NULL, created_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS quotes_owner ON quotes(owner,created_at DESC);')
+        db.executescript('PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS quotes (id TEXT PRIMARY KEY, owner TEXT NOT NULL, payload TEXT NOT NULL, total_cents INTEGER NOT NULL, created_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS quotes_owner_history ON quotes(owner,created_at DESC,id DESC);')
     DATABASE.chmod(0o600)
 
 @asynccontextmanager
@@ -101,6 +107,13 @@ async def lifespan(app):
     if not ISSUER or not AUDIENCE:
         raise RuntimeError('Configura OIDC_ISSUER y OIDC_AUDIENCE.')
     validate_url(ISSUER)
+    if OIDC_PROVIDER not in ('standard','google'):
+        raise RuntimeError('OIDC_PROVIDER debe ser standard o google.')
+    if OIDC_PROVIDER=='google':
+        issuer_url=urlparse(ISSUER)
+        local=os.environ.get('APP_ENV')=='development' and os.environ.get('OIDC_ALLOW_LOCAL_HTTP')=='true' and issuer_url.scheme=='http' and issuer_url.hostname in ('127.0.0.1','localhost')
+        if not local and (ISSUER!='https://accounts.google.com' or not re.fullmatch(r'[A-Za-z0-9_-]+\.apps\.googleusercontent\.com',AUDIENCE)):
+            raise RuntimeError('Configura el emisor oficial y la audiencia del cliente OAuth de Google.')
     async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
         response = await client.get(ISSUER.rstrip('/') + '/.well-known/openid-configuration')
         response.raise_for_status()
@@ -113,7 +126,7 @@ async def lifespan(app):
     initialize_catalog(DATABASE, os.environ.get('CATALOG_FILE'))
     yield
 
-app = FastAPI(title='CotizaSweet API',version='2.1.0',lifespan=lifespan,docs_url=None,redoc_url=None)
+app = FastAPI(title='CotizaSweet API',version='2.2.0',lifespan=lifespan,docs_url=None,redoc_url=None)
 
 @app.middleware('http')
 async def no_store(request, call_next):
@@ -133,15 +146,54 @@ def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer))
         claims = jwt.decode(credentials.credentials,key.key,algorithms=['RS256'],audience=AUDIENCE,issuer=ISSUER,options={'require':['exp','iss','aud','sub','iat']},leeway=30)
         if not isinstance(claims['sub'],str) or not claims['sub']:
             raise ValueError('Subject inválido')
+        if OIDC_PROVIDER=='google':
+            multiple_audiences=isinstance(claims['aud'],list) and len(claims['aud'])>1
+            if (claims.get('email_verified') is not True or claims.get('azp',AUDIENCE)!=AUDIENCE
+                    or (multiple_audiences and claims.get('azp')!=AUDIENCE)):
+                raise ValueError('Cuenta de Google no verificada')
     except Exception:
         raise HTTPException(401,'Token inválido o expirado.',headers={'WWW-Authenticate':'Bearer'})
     owner = hashlib.sha256(json.dumps([ISSUER,claims['sub']],ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
-    scopes = claims.get('scope',claims.get('scp',''))
+    scopes = 'quotes:read quotes:write' if OIDC_PROVIDER=='google' else claims.get('scope',claims.get('scp',''))
     if not isinstance(scopes,str): scopes = ''
     return owner, scopes.split()
 
+def reject_json_constant(value):
+    raise ValueError('Número JSON inválido')
+
 def record(row):
-    return dict(id=row['id'],quote=json.loads(row['payload']),totalCents=row['total_cents'],createdAt=row['created_at'])
+    quote = None
+    if isinstance(row['payload'], str):
+        try:
+            value = json.loads(row['payload'], parse_constant=reject_json_constant)
+            if isinstance(value, dict):
+                # The API encoder requires finite numbers and Unicode that can be serialized as UTF-8.
+                json.dumps(value, ensure_ascii=False, allow_nan=False).encode('utf-8')
+                quote = value
+        except (ValueError, RecursionError):
+            pass
+    return dict(id=row['id'],quote=quote,totalCents=row['total_cents'],createdAt=row['created_at'])
+
+def encode_history_cursor(created_at, quote_id):
+    encoded = base64.urlsafe_b64encode((created_at+'|'+quote_id).encode()).decode().rstrip('=')
+    return 'v1.'+encoded
+
+def read_history_cursor(values):
+    # Keep this wire format in sync with web/server/history-page.ts and .NET QuoteHistory.
+    if not values:
+        return None
+    if len(values) == 1 and re.fullmatch(r'v1\.[A-Za-z0-9_-]{82}', values[0]):
+        token = values[0]
+        try:
+            decoded = base64.urlsafe_b64decode(token[3:]+'==')
+            if HISTORY_CURSOR_PATTERN.fullmatch(decoded):
+                created_at, quote_id = decoded.decode('ascii').split('|')
+                dt.datetime.fromisoformat(created_at)
+                if encode_history_cursor(created_at, quote_id) == token:
+                    return created_at, quote_id
+        except (ValueError, binascii.Error):
+            pass
+    raise HTTPException(400, 'Cursor del historial inválido.')
 
 @app.get('/api/catalog')
 def catalog():
@@ -151,13 +203,23 @@ def catalog():
 def health():return {'status':'ok'}
 
 @app.get('/api/quotes')
-def get_quotes(user=Depends(identity)):
+def get_quotes(request: Request,user=Depends(identity)):
     owner, scopes = user
     if 'quotes:read' not in scopes: raise HTTPException(403,'Permiso quotes:read requerido.')
     rate_limit(owner,'read')
+    cursor = read_history_cursor(request.query_params.getlist('cursor'))
+    condition = 'AND (created_at,id) < (?,?)' if cursor else ''
     with connection() as db:
-        rows = db.execute('SELECT * FROM quotes WHERE owner=? ORDER BY created_at DESC,id DESC LIMIT 200',(owner,)).fetchall()
-    return {'quotes':[record(row) for row in rows]}
+        rows = db.execute(f'''
+            SELECT id,created_at,
+              CASE WHEN typeof(total_cents)='integer' AND total_cents BETWEEN 0 AND 9007199254740991 THEN total_cents END AS total_cents,
+              CASE WHEN length(CAST(payload AS BLOB)) <= ? THEN payload END AS payload
+            FROM quotes WHERE owner=? {condition}
+            ORDER BY created_at DESC,id DESC LIMIT ?
+        ''', (HISTORY_PAYLOAD_LIMIT,owner,*(cursor or ()),HISTORY_PAGE_SIZE+1)).fetchall()
+    page = rows[:HISTORY_PAGE_SIZE]
+    next_cursor = encode_history_cursor(page[-1]['created_at'], page[-1]['id']) if len(rows)>HISTORY_PAGE_SIZE else None
+    return {'quotes':[record(row) for row in page], 'nextCursor': next_cursor}
 
 @app.post('/api/quotes',status_code=201)
 async def post_quote(request:Request,user=Depends(identity)):
@@ -172,7 +234,8 @@ async def post_quote(request:Request,user=Depends(identity)):
     try:
         q=await verify_quote_identity(q)
     except LookupError as exc:
-        raise HTTPException(exc.status,str(exc))
+        headers={'Retry-After':str(exc.retry_after)} if exc.status==429 and exc.retry_after else None
+        raise HTTPException(exc.status,str(exc),headers=headers)
     result=dict(id=str(uuid.uuid4()),quote=q,totalCents=totals(q)['total'],createdAt=dt.datetime.now(dt.timezone.utc).isoformat(timespec='milliseconds').replace('+00:00','Z'))
     def save():
         with connection() as db:

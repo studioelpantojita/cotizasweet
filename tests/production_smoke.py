@@ -9,6 +9,7 @@ import tempfile
 import time
 import httpx
 from process_tree import OwnedProcess
+from tls_proxy import local_https_proxy
 
 ROOT=Path(__file__).resolve().parents[1]
 ORIGIN='http://127.0.0.1:3390'
@@ -23,6 +24,11 @@ async def public_load():
             assert response.status_code==200,(route,response.status_code)
             assert response.headers.get('x-content-type-options')=='nosniff'
             assert response.headers.get('x-frame-options')=='DENY'
+            policy=response.headers.get('content-security-policy','')
+            assert "frame-ancestors 'none'" in policy
+            required="default-src 'none'" if route.startswith('/api/') else "'strict-dynamic'"
+            assert required in policy
+            assert response.headers.get('strict-transport-security')=='max-age=63072000'
         assert (await client.get('/api/quotes')).status_code==401
         async def request(index):
             async with semaphore:
@@ -43,7 +49,7 @@ async def public_load():
 def main():
     with tempfile.TemporaryDirectory(prefix='sweet-production-smoke-') as temp:
         env={k:v for k,v in os.environ.items() if not k.lower().endswith('_proxy')}
-        env.update(NODE_ENV='production',NEXT_TELEMETRY_DISABLED='1',APP_ORIGIN='https://smoke.invalid',API_BACKEND='next',DATABASE_PATH=str(Path(temp)/'smoke.sqlite'))
+        env.update(NODE_ENV='production',NEXT_TELEMETRY_DISABLED='1',APP_ORIGIN='https://localhost:3391',API_BACKEND='next',DATABASE_PATH=str(Path(temp)/'smoke.sqlite'))
         with (Path(temp)/'next.log').open('w',encoding='utf-8') as log:
             proc=OwnedProcess([os.environ.get('NODE_EXEC','node'),'node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3390'],cwd=ROOT/'web',env=env,stdout=log,stderr=log)
             try:
@@ -55,6 +61,11 @@ def main():
                     time.sleep(.25)
                 else:raise TimeoutError('Production server did not become ready')
                 report={'status':'passed','scope':'Local production build; public routes only. Authenticated writes and real OIDC/RUC are covered separately or pending external setup.','smoke_routes':5,'result':asyncio.run(public_load())}
+                if os.environ.get('RUN_BROWSER_E2E')=='1':
+                    with local_https_proxy(Path(temp),ORIGIN,3391) as origin:
+                        subprocess.run([env.get('NODE_EXEC','node'),str(ROOT/'tests/production_browser.mjs')],
+                            cwd=ROOT,env={**env,'E2E_ORIGIN':origin},check=True)
+                    report['production_browser']='passed; ephemeral localhost TLS'
                 artifact=ROOT/'tests/artifacts/production-smoke.json';artifact.parent.mkdir(parents=True,exist_ok=True);artifact.write_text(json.dumps(report,indent=2),encoding='utf-8')
                 print(json.dumps(report))
             finally:

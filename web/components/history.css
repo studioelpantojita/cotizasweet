@@ -1,0 +1,17 @@
+.history-legacy {
+  background-color: var(--color-secondary);
+  color: var(--color-secondary-foreground);
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}

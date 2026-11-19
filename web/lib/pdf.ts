@@ -1,5 +1,6 @@
 import {clientDocumentType} from './identity';
 import {jsPDF} from 'jspdf';
+import {drawBrandSignature} from './brand-pdf';
 import {ingredientDetails} from './ingredients';
 import {referenceBusiness} from './reference-business';
 import {catalog,addons,money,quoteSchema,totals,projectInfo,materialConditions,locationLabel,locationDetail,paymentConditions,type Quote,type QuoteItem} from './quote';
@@ -18,7 +19,7 @@ export function createQuotePdf(input:Quote,id:string|undefined,fonts:PdfFonts){
  const q=quoteSchema.parse(input),t=totals(q),info=projectInfo(q.projectType);
  const doc=new jsPDF({unit:'mm',format:'a4',compress:true});
  for(const [style,data] of [['normal',fonts.regular],['bold',fonts.bold]] as const){doc.addFileToVFS(`quote-${style}.ttf`,data);doc.addFont(`quote-${style}.ttf`,'QuoteFont',style);}
- const c={ink:'#501b2f',body:'#493a40',muted:'#77686e',pale:'#f4edef',stripe:'#faf7f8',line:'#e2d5da',white:'#ffffff'};
+ const c={ink:'#581a32',body:'#36262c',muted:'#77686e',pale:'#f4edef',stripe:'#fffaf7',line:'#e2d5da',white:'#ffffff'};
  const left=16,right=194,width=178,bottom=275;
  const reference=id?`COT-${id.slice(0,8).toUpperCase()}`:'VISTA PREVIA';let y=39,section='COTIZACIÓN';
  const clean=(value:string)=>value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[\u2011\u2013\u2014]/g,'-');
@@ -105,7 +106,7 @@ export function createQuotePdf(input:Quote,id:string|undefined,fonts:PdfFonts){
   for(const line of details){if(!line.trim())continue;if(titles.has(line)){y+=3;heading(single(line));}else{flow(line,8.7,4.3);y+=3;}}
   if(terms.length){y+=4;heading('Condiciones de insumos');terms.forEach((term,i)=>{flow(`${i+1}. ${term}`);y+=3;});}
  }
- const pages=doc.getNumberOfPages();for(let n=1;n<=pages;n++){doc.setPage(n);rule(283);write('E&A COTIZA · PASTELERÍA',left,289,7.1,true,c.muted);write('Propuesta comercial. No es un comprobante de pago.',80,289,6.8,false,c.muted);write(`${n} / ${pages}`,right,289,7.4,false,c.muted,'right');}
+ const pages=doc.getNumberOfPages();for(let n=1;n<=pages;n++){doc.setPage(n);rule(283);drawBrandSignature(doc,left,284.8,42);write('Propuesta comercial. No es un comprobante de pago.',80,289,6.8,false,c.muted);write(`${n} / ${pages}`,right,289,7.4,false,c.muted,'right');}
  doc.setProperties({title:`${reference} · ${single(q.event)||info.label}`,subject:`Cotización de pastelería · ${single(q.client)}`,author:'E&A Cotiza · Identidad referencial',creator:'E&A Cotiza · Plantilla 4'});return doc;
 }
 export async function quotePdfBlob(q:Quote,id?:string){const [regular,bold]=await Promise.all([loadFont('/fonts/quote-regular.ttf'),loadFont('/fonts/quote-bold.ttf')]);return createQuotePdf(q,id,{regular,bold}).output('blob');}

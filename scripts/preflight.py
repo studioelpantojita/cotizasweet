@@ -5,7 +5,7 @@ import argparse
 import ipaddress
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 from urllib.parse import urlsplit
 
@@ -90,7 +90,14 @@ def evaluate(config: dict[str, str]) -> dict:
     check('oidc_client_secret', _set(client_secret) and len(client_secret) >= 16, 'OIDC_CLIENT_SECRET debe estar presente y tener al menos 16 caracteres.')
     check('oidc_audience', _set(config.get('OIDC_AUDIENCE', '')), 'OIDC_AUDIENCE debe corresponder al API registrado en el proveedor.')
     scopes = set(config.get('OIDC_SCOPE', '').split())
-    check('oidc_scopes', {'openid', 'quotes:read', 'quotes:write'} <= scopes, 'OIDC_SCOPE debe incluir openid, quotes:read y quotes:write.')
+    provider = config.get('OIDC_PROVIDER', 'standard')
+    check('oidc_provider', provider in ('standard','google'), 'OIDC_PROVIDER debe ser standard o google.')
+    if provider == 'google':
+        check('google_issuer', config.get('OIDC_ISSUER') == 'https://accounts.google.com', 'El perfil Google usa el emisor oficial https://accounts.google.com.')
+        check('google_audience', bool(re.fullmatch(r'[A-Za-z0-9_-]+\.apps\.googleusercontent\.com',config.get('OIDC_CLIENT_ID',''))) and config.get('OIDC_AUDIENCE') == config.get('OIDC_CLIENT_ID'), 'OIDC_AUDIENCE debe coincidir con OIDC_CLIENT_ID del cliente OAuth web de Google.')
+        check('oidc_scopes', scopes == {'openid','profile','email'}, 'Google solicita exclusivamente openid, profile y email para el inicio de sesión.')
+    else:
+        check('oidc_scopes', {'openid', 'quotes:read', 'quotes:write'} <= scopes, 'OIDC_SCOPE debe incluir openid, quotes:read y quotes:write.')
     session = config.get('SESSION_SECRET', '')
     check('session_secret', re.fullmatch(r'[a-fA-F0-9]{64}', session) is not None and len(set(session.lower())) >= 8, 'SESSION_SECRET debe contener 32 bytes aleatorios codificados en 64 dígitos hexadecimales, sin valores triviales.')
     service = config.get('INTEGRATION_SERVICE_KEY', '')
@@ -98,6 +105,11 @@ def evaluate(config: dict[str, str]) -> dict:
     check('ruc_provider', config.get('RUC_PROVIDER') == 'decolecta', 'RUC_PROVIDER debe ser decolecta para verificar RUC reales; demo y disabled bloquean esta validación de producción.')
     token = config.get('RUC_API_TOKEN', '')
     check('ruc_token', _set(token) and not token.lower().startswith('bearer ') and not any(char.isspace() for char in token), 'RUC_API_TOKEN debe estar presente sin el prefijo Bearer ni espacios.')
+    daily_limit = config.get('RUC_DAILY_LIMIT', '500')
+    check('ruc_daily_limit', bool(re.fullmatch(r'[0-9]{1,6}', daily_limit) and 1 <= int(daily_limit) <= 100_000), 'RUC_DAILY_LIMIT debe ser un entero entre 1 y 100000. El valor predeterminado es 500.')
+    quota_path = config.get('RUC_QUOTA_PATH', '')
+    absolute_quota_path = PurePosixPath(quota_path).is_absolute() or PureWindowsPath(quota_path).is_absolute()
+    check('ruc_quota_path', _set(quota_path) and absolute_quota_path, 'RUC_QUOTA_PATH debe ser la ruta absoluta al archivo SQLite de cuota dentro del volumen del servicio RUC.')
     backend = config.get('API_BACKEND', '')
     check('api_backend', backend in ('next', 'dotnet', 'python'), 'API_BACKEND debe seleccionarse explícitamente.')
     if backend in ('dotnet', 'python'):
