@@ -34,6 +34,52 @@ def synthetic_configuration():
 
 
 class PreflightTests(unittest.TestCase):
+    def test_backup_options_are_optional_and_accept_defaults_disabled_and_custom_values(self):
+        defaults = preflight.evaluate(synthetic_configuration())
+        self.assertEqual(defaults['status'], 'passed')
+        for options in (
+            {'BACKUP_INTERVAL_HOURS':'', 'BACKUP_KEEP':'', 'BACKUP_DIR':''},
+            {'BACKUP_INTERVAL_HOURS':'  ', 'BACKUP_KEEP':'\t', 'BACKUP_DIR':'\t'},
+            {'BACKUP_INTERVAL_HOURS':' \t12\t ', 'BACKUP_KEEP':'\t14\t', 'BACKUP_DIR':'\t \r\n'},
+            {'BACKUP_INTERVAL_HOURS':'0', 'BACKUP_KEEP':'1'},
+            {'BACKUP_INTERVAL_HOURS':'168', 'BACKUP_KEEP':'365', 'BACKUP_DIR':'/app/data/backup-custom'},
+            {'BACKUP_INTERVAL_HOURS':' 12 ', 'BACKUP_KEEP':' 14 ', 'BACKUP_DIR':'respaldos-locales'},
+            {'BACKUP_INTERVAL_HOURS':'0001', 'BACKUP_KEEP':'0007', 'BACKUP_DIR':r'C:\datos\respaldos'},
+        ):
+            with self.subTest(options=options):
+                result = preflight.evaluate({**synthetic_configuration(), **options})
+                self.assertEqual(result['status'], 'passed')
+                self.assertNotIn(options.get('BACKUP_DIR') or 'private-path-marker', json.dumps(result))
+
+    def test_invalid_backup_ranges_and_control_characters_fail_without_echoing_paths(self):
+        cases = {
+            'BACKUP_INTERVAL_HOURS':['-1', '169', '1.5', '+1', '1e1', '１２', '00024'],
+            'BACKUP_KEEP':['0', '-1', '366', '2.5', '+7', '１', '00007'],
+            'BACKUP_DIR':['private-path-marker\x00', 'private-path-marker\nnext', 'private-path-marker\x85next'],
+        }
+        for key, values in cases.items():
+            for value in values:
+                with self.subTest(key=key, value=value):
+                    result = preflight.evaluate({**synthetic_configuration(), key:value})
+                    self.assertEqual(result['status'], 'failed')
+                    self.assertNotIn('private-path-marker', json.dumps(result))
+
+    def test_backup_options_reject_controls_that_python_strips_but_dotnet_preserves(self):
+        for codepoint in range(0x1c, 0x20):
+            control = chr(codepoint)
+            for key, valid in (
+                ('BACKUP_INTERVAL_HOURS', '24'),
+                ('BACKUP_KEEP', '7'),
+                ('BACKUP_DIR', 'private-path-marker'),
+            ):
+                for value in (control, f' \t{control}\t ', control + valid, valid + control):
+                    with self.subTest(key=key, codepoint=codepoint, value=value):
+                        result = preflight.evaluate({**synthetic_configuration(), key:value})
+                        self.assertEqual(result['status'], 'failed')
+                        check = next(item for item in result['checks'] if item['id'] == key.lower())
+                        self.assertEqual(check['status'], 'failed')
+                        self.assertNotIn('private-path-marker', json.dumps(result))
+
     def test_google_profile_checks_issuer_client_audience_and_basic_scopes(self):
         config={**synthetic_configuration(),'OIDC_PROVIDER':'google','OIDC_ISSUER':'https://accounts.google.com',
                 'OIDC_CLIENT_ID':'123456-synthetic.apps.googleusercontent.com',

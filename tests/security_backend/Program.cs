@@ -7,6 +7,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 if (args.Length == 2 && args[0] == "--backup-fixture")
 {
@@ -262,6 +263,90 @@ finally
     SqliteConnection.ClearAllPools();
     damagedBackupRoot.Delete(recursive:true);
 }
+var configuredBackupRoot = Directory.CreateTempSubdirectory("cotiza-configured-backup-test-");
+try
+{
+    var origin = Path.Combine(configuredBackupRoot.FullName, "quotes.sqlite");
+    var defaults = BackupOptions.From(Config(), origin);
+    Check(defaults.Directory == Path.Combine(configuredBackupRoot.FullName, "backups") &&
+          defaults.Interval == TimeSpan.FromHours(24) && defaults.Keep == 7 && defaults.Enabled,
+          "Default backup configuration changed");
+    var blank = BackupOptions.From(Config(new(){{"BACKUP_INTERVAL_HOURS"," "},{"BACKUP_KEEP",""},{"BACKUP_DIR"," "}}), origin);
+    Check(blank == defaults, "Blank optional backup settings did not use defaults");
+    var relative = BackupOptions.From(Config(new(){{"BACKUP_DIR","relative-backup-settings-test"}}), origin);
+    Check(relative.Directory == Path.GetFullPath("relative-backup-settings-test"), "Relative backup directory was not canonicalized");
+    foreach (var entry in new[]
+    {
+        ("BACKUP_INTERVAL_HOURS", "-1"), ("BACKUP_INTERVAL_HOURS", "169"),
+        ("BACKUP_INTERVAL_HOURS", "1.5"), ("BACKUP_INTERVAL_HOURS", "+2"),
+        ("BACKUP_INTERVAL_HOURS", "10000"), ("BACKUP_INTERVAL_HOURS", "١"),
+        ("BACKUP_KEEP", "0"), ("BACKUP_KEEP", "366"), ("BACKUP_KEEP", "7.0"),
+        ("BACKUP_KEEP", "10000"), ("BACKUP_DIR", "invalid\0directory"),
+        ("BACKUP_DIR", "invalid\ndirectory")
+    })
+    {
+        var rejected = false;
+        try { BackupOptions.From(Config(new(){{entry.Item1,entry.Item2}}), origin); }
+        catch (InvalidOperationException error) { rejected = !error.Message.Contains(entry.Item2); }
+        Check(rejected, "Invalid backup configuration was accepted or included its value in the error");
+    }
+    var disabledDirectory = Path.Combine(configuredBackupRoot.FullName, "disabled");
+    var disabledOptions = BackupOptions.From(Config(new()
+        {{"BACKUP_INTERVAL_HOURS","0"},{"BACKUP_DIR",disabledDirectory}}), origin);
+    var disabled = new QuoteBackup(origin, disabledOptions);
+    Check(!disabled.Enabled && !disabled.CreateIfDue(DateTimeOffset.UtcNow) && !Directory.Exists(disabledDirectory),
+          "Disabled backup accessed the database or created a directory");
+    var store = new QuoteStore(origin);
+    var payload = JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"contracts","example-quote.json")))!.AsObject();
+    store.Save("configured-backup-owner", payload);
+    var custom = BackupOptions.From(Config(new()
+        {{"BACKUP_INTERVAL_HOURS","2"},{"BACKUP_KEEP","2"},
+         {"BACKUP_DIR",Path.Combine(configuredBackupRoot.FullName,"custom")}}), origin);
+    var backup = new QuoteBackup(origin, custom);
+    var start = new DateTimeOffset(2026,11,1,3,0,0,TimeSpan.Zero);
+    Check(backup.CreateIfDue(start), "Custom backup directory did not receive its first snapshot");
+    Check(!backup.CreateIfDue(start.AddHours(1)), "Custom interval created a snapshot too early");
+    Check(backup.CreateIfDue(start.AddHours(2)) && backup.CreateIfDue(start.AddHours(4)), "Custom interval was not used");
+    var snapshots = Directory.GetFiles(custom.Directory,"cotiza-*.sqlite").Order(StringComparer.Ordinal).ToArray();
+    Check(snapshots.Length == 2 && snapshots[0].Contains("20261101T050000000Z"), "Custom retention did not keep the latest two valid snapshots");
+    Check(!new QuoteBackup(origin,custom).CreateIfDue(start.AddHours(5)), "Restart forgot the last valid snapshot under custom settings");
+    Check(!Directory.Exists(defaults.Directory), "Custom configuration wrote to the default directory");
+
+    // A deterministic clock injects an unexpected failure, then drives the next hourly check.
+    var workerDirectory = Path.Combine(configuredBackupRoot.FullName,"worker");
+    var workerBackup = new QuoteBackup(origin, custom with { Directory = workerDirectory });
+    var clock = new BackupTestClock(start);
+    var logger = new BackupTestLogger();
+    using (var worker = new QuoteBackupWorker(workerBackup,clock,logger))
+    {
+        await worker.StartAsync(CancellationToken.None);
+        var warning = await logger.Warning.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Check(warning.Contains(nameof(InvalidOperationException)) && !warning.Contains("PRIVATE-TEST-DETAIL"),
+              "Unexpected backup failure was not sanitized");
+        Check(worker.ExecuteTask is { IsFaulted:false,IsCompleted:false }, "Unexpected backup failure stopped its worker");
+        clock.Tick();
+        await logger.Information.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Check(Directory.GetFiles(workerDirectory,"cotiza-*.sqlite").Length == 1, "Worker did not retry after an unexpected failure");
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await worker.StopAsync(deadline.Token);
+        Check(worker.ExecuteTask is { IsCompleted:true,IsFaulted:false }, "Worker cancellation did not complete cleanly");
+    }
+    var disabledClock = new BackupTestClock(start);
+    var disabledLogger = new BackupTestLogger();
+    using (var worker = new QuoteBackupWorker(disabled,disabledClock,disabledLogger))
+    {
+        await worker.StartAsync(CancellationToken.None);
+        await disabledLogger.Information.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await worker.StopAsync(CancellationToken.None);
+        Check(disabledClock.Reads == 0 && !disabledClock.TimerCreated && disabledLogger.WarningCount == 0,
+              "Disabled worker created a timer or attempted a backup");
+    }
+}
+finally
+{
+    SqliteConnection.ClearAllPools();
+    configuredBackupRoot.Delete(recursive:true);
+}
 Console.WriteLine($"PASS: {assertions} .NET backend and backup assertions");
 
 sealed class TestEnvironment:IHostEnvironment {
@@ -272,4 +357,55 @@ sealed class TestEnvironment:IHostEnvironment {
 }
 sealed class StaticHandler(int status,string body):HttpMessageHandler {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellation)=>Task.FromResult(new HttpResponseMessage((HttpStatusCode)status){Content=new StringContent(body,Encoding.UTF8,"application/json")});
+}
+
+sealed class BackupTestClock(DateTimeOffset now) : TimeProvider
+{
+    BackupTestTimer? timer;
+    int reads;
+    public int Reads => reads;
+    public bool TimerCreated => timer is not null;
+    public override DateTimeOffset GetUtcNow()
+    {
+        if (Interlocked.Increment(ref reads) == 1)
+            throw new InvalidOperationException("PRIVATE-TEST-DETAIL");
+        return now;
+    }
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        if (dueTime != TimeSpan.FromHours(1) || period != dueTime)
+            throw new InvalidOperationException("Unexpected scheduler period");
+        timer = new BackupTestTimer(callback,state);
+        return timer;
+    }
+    public void Tick() => (timer ?? throw new InvalidOperationException("Worker timer missing")).Fire();
+}
+
+sealed class BackupTestTimer(TimerCallback callback, object? state) : ITimer
+{
+    bool disposed;
+    public bool Change(TimeSpan dueTime,TimeSpan period) => !disposed;
+    public void Fire() { if (!disposed) callback(state); }
+    public void Dispose() => disposed = true;
+    public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
+}
+
+sealed class BackupTestLogger : ILogger<QuoteBackupWorker>
+{
+    public readonly TaskCompletionSource<string> Warning = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public readonly TaskCompletionSource<string> Information = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    int warningCount;
+    public int WarningCount => warningCount;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(LogLevel level) => true;
+    public void Log<TState>(LogLevel level,EventId eventId,TState state,Exception? error,Func<TState,Exception?,string> formatter)
+    {
+        var message = formatter(state,error);
+        if (level == LogLevel.Warning)
+        {
+            Interlocked.Increment(ref warningCount);
+            Warning.TrySetResult(message);
+        }
+        if (level == LogLevel.Information) Information.TrySetResult(message);
+    }
 }

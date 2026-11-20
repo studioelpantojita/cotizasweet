@@ -35,8 +35,9 @@ builder.Services.AddAuthorization(options=>{
     options.AddPolicy("write",p=>p.RequireAuthenticatedUser().RequireAssertion(c=>HasScope(c.User,"quotes:write")));
 });
 var quoteDatabase=builder.Configuration["DATABASE_PATH"]??"./data/dotnet.sqlite";
+var backupOptions=BackupOptions.From(builder.Configuration,quoteDatabase);
 builder.Services.AddSingleton(new QuoteStore(quoteDatabase));
-builder.Services.AddSingleton(new QuoteBackup(quoteDatabase));
+builder.Services.AddSingleton(new QuoteBackup(quoteDatabase,backupOptions));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<QuoteBackupWorker>();
 builder.Services.AddHttpClient<RucClient>().ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false});

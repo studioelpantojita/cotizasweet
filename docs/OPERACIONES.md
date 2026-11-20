@@ -1,6 +1,6 @@
 # Operaciones y comprobaciones previas
 
-Los programas `scripts/backup_sqlite.py` y `scripts/preflight.py` usan únicamente la biblioteca estándar de Python 3.12 o posterior. No seleccionan bases ni leen archivos privados de forma implícita. Ejecútalos desde la raíz del proyecto con el Python de su entorno virtual. Esta guía corresponde a E&A Cotiza **2.2.0** y distingue el respaldo automático .NET de las tareas manuales del operador.
+Los programas `scripts/backup_sqlite.py` y `scripts/preflight.py` usan únicamente la biblioteca estándar de Python 3.12 o posterior. No seleccionan bases ni leen archivos privados de forma implícita. Ejecútalos desde la raíz del proyecto con el Python de su entorno virtual. Esta guía corresponde a E&A Cotiza **2.2.1** y distingue el respaldo automático .NET de las tareas manuales del operador.
 
 ## Respaldo consistente de SQLite
 
@@ -19,9 +19,23 @@ SHA-256 detecta cambios respecto al metadato conservado, pero no es una firma ni
 
 ## Respaldo automático de la API .NET
 
-`QuoteBackupWorker` comprueba el calendario al arrancar y cada hora. Si no hay una copia completa válida, o han pasado al menos **24 horas** desde la más reciente, respalda la base configurada por `DATABASE_PATH` mediante la API online SQLite. Comprueba `PRAGMA integrity_check`, calcula SHA-256 y publica el archivo junto con su metadato. Usa un bloqueo entre procesos para evitar copias simultáneas del planificador.
+`QuoteBackupWorker` comprueba el calendario al arrancar y cada hora. Si no hay una copia completa válida, o ha transcurrido el intervalo configurado desde la más reciente, respalda la base seleccionada por `DATABASE_PATH` mediante la API online SQLite. Comprueba `PRAGMA integrity_check`, calcula SHA-256 y publica el archivo junto con su metadato. Usa un bloqueo entre procesos para evitar copias simultáneas y consulta la edad de las copias existentes después de un reinicio.
 
-Las copias quedan en `backups/` junto a la base: con el despliegue preparado, `/app/data/backups` del volumen .NET. Conserva las **siete copias completas válidas más recientes** creadas por este planificador. Para reconocerlas exige su patrón de nombre, metadato, tamaño y coincidencia del SHA-256 calculado sobre el archivo; una copia alterada no cuenta para aplazar el siguiente respaldo ni para completar esa retención. Los archivos ajenos al patrón del planificador no se podan. Revisa el espacio y las advertencias genéricas del servicio si una copia falla.
+La versión 2.2.1 incorpora estas opciones del servicio .NET. Son opcionales y se validan durante el arranque.
+
+| Variable | Valor predeterminado | Valores admitidos |
+|---|---|---|
+| `BACKUP_INTERVAL_HOURS` | `24` | Entero de 0 a 168. `0` desactiva el respaldo automático |
+| `BACKUP_KEEP` | `7` | Entero de 1 a 365, aplicado a las copias completas válidas |
+| `BACKUP_DIR` | `backups/` junto a la base | Ruta absoluta o relativa, resuelta desde el directorio de trabajo del proceso, sin caracteres de control |
+
+Omitir una opción o dejarla vacía utiliza su valor predeterminado. Los valores numéricos admiten de uno a cuatro dígitos ASCII y espacios exteriores. El intervalo expresa el tiempo mínimo entre copias y la comprobación horaria determina cuándo se ejecuta la siguiente. La API continúa atendiendo peticiones si una operación de respaldo falla, registra únicamente el tipo de error y vuelve a comprobar en el ciclo siguiente. Una configuración inválida impide iniciar el servicio y debe corregirse antes de aceptar tráfico.
+
+Con la configuración predeterminada, las copias quedan en `/app/data/backups` del volumen .NET y se conservan las **siete copias completas válidas más recientes**. Para reconocerlas se exige el patrón de nombre del planificador, metadato, tamaño y coincidencia del SHA-256 calculado sobre el archivo. La retención y la selección del último respaldo utilizan esa comprobación. Los archivos ajenos al patrón del planificador se excluyen de la poda. Revisa el espacio y los avisos del servicio si una copia falla.
+
+En Compose, las tres opciones se transmiten exclusivamente a `api-dotnet`. En Railway se pueden configurar como variables del servicio `api-dotnet`, con los mismos valores predeterminados de la aplicación. Un directorio personalizado debe corresponder al almacenamiento persistente o externo que el operador haya preparado. Al cambiar de directorio, incluye las copias de la ubicación anterior en la política de conservación y recuperación.
+
+Dedica cada directorio de respaldos a una sola base. El reconocimiento y la retención se aplican a las copias válidas del planificador que contiene ese directorio. El lanzador de desarrollo `EA.Cotiza.Local` fija `data/backups` de su propia copia, intervalo de 24 horas y retención de siete copias para mantener separadas las revisiones locales.
 
 El formato de metadatos es compatible con `scripts/backup_sqlite.py verify` y `restore`. La prueba `tests/operations/test_dotnet_backup.py` crea una copia .NET con datos sintéticos y WAL, la verifica y restaura con Python y compara filas e integridad de origen, respaldo y restauración. Consulta el acta de esta versión para el resultado de la ejecución correspondiente.
 
@@ -42,7 +56,7 @@ El respaldo es por base. No coordina una transacción entre los tres servicios n
 
 ## Cuota RUC y tercer volumen persistente
 
-La configuración de Compose e IaC de 2.2.0 requiere **tres volúmenes**: sesiones web, cotizaciones .NET y datos del servicio Python/RUC. En Python, `RUC_QUOTA_PATH=/app/data/ruc-quota.sqlite` conserva el contador aunque se reinicie el proceso. Debe ser una ruta absoluta dentro de su volumen persistente; conservar únicamente los volúmenes web y .NET perdería esta protección al recrear Python.
+La configuración de Compose e IaC de 2.2.1 requiere **tres volúmenes**: sesiones web, cotizaciones .NET y datos del servicio Python/RUC. En Python, `RUC_QUOTA_PATH=/app/data/ruc-quota.sqlite` conserva el contador aunque se reinicie el proceso. Debe ser una ruta absoluta dentro de su volumen persistente; conservar únicamente los volúmenes web y .NET perdería esta protección al recrear Python.
 
 `RUC_DAILY_LIMIT` admite un entero entre 1 y 100000 y parte de 500. Cuenta los intentos enviados a Decolecta por día civil de Perú, con UTC−05:00 explícito, reservando cuota antes de la petición porque una respuesta fallida podría ser facturable. Las respuestas de la caché de cinco minutos y las peticiones concurrentes deduplicadas no realizan una nueva reserva. La caché y la deduplicación son locales al proceso; el contador diario es SQLite persistente. Al agotarse devuelve HTTP 429 y `Retry-After` hasta la siguiente medianoche en Perú; si no puede comprobar el contador, rechaza la consulta con HTTP 503.
 
@@ -58,13 +72,13 @@ También se puede omitir `--env-file` para validar exclusivamente las variables 
 
 El programa comprueba origen HTTPS público, emisor OIDC sin HTTP ni destinos locales/de ejemplo, cliente y audiencia presentes y desactivación explícita de HTTP local. Para `OIDC_PROVIDER=google` exige el emisor oficial, client ID web con terminación `.apps.googleusercontent.com`, audiencia idéntica al client ID y exactamente los scopes básicos `openid profile email`. Para `standard` exige que se incluyan `openid`, `quotes:read` y `quotes:write`.
 
-También comprueba claves de sesión e integración con formato y longitud adecuados y diferentes entre sí, Decolecta con token presente, cuota diaria válida, `RUC_QUOTA_PATH` absoluto, backend y URLs internas permitidas. Si se declaran modos de entorno, deben ser de producción. La cabecera opcional de IP debe estar admitida y ser reemplazada por un proxy confiable. El preflight rechaza la identidad local de pruebas y los proveedores RUC `demo` o `disabled` para la aceptación de producción.
+También comprueba claves de sesión e integración con formato y longitud adecuados y diferentes entre sí, Decolecta con token presente, cuota diaria válida, `RUC_QUOTA_PATH` absoluto, backend y URLs internas permitidas. Las opciones de respaldo son opcionales y se comprueban con los rangos del servicio .NET; `BACKUP_DIR` admite rutas relativas y el preflight valida su texto sin acceder al directorio. Si se declaran modos de entorno, deben ser de producción. La cabecera opcional de IP debe estar admitida y ser reemplazada por un proxy confiable. El preflight rechaza la identidad local de pruebas y los proveedores RUC `demo` o `disabled` para la aceptación de producción.
 
 La salida JSON enumera verificaciones sin mostrar valores de configuración. El código de salida es `0` cuando pasan, `1` ante una configuración no apta y `2` ante un error de lectura/formato del archivo. Los programas de respaldo usan `0` para éxito y `1` para fallo.
 
 El preflight es estático y no usa la red. Un resultado satisfactorio no acredita DNS, certificado TLS, disponibilidad ni permisos del proveedor OIDC, legitimidad de credenciales, entrega RUC, identidad comercial, Docker o publicación. La longitud y variedad de una clave no prueban su aleatoriedad: genérala mediante un generador criptográfico. Antes de publicar se requieren las comprobaciones reales del entorno y un ensayo de restauración con datos de prueba.
 
-La entrega 2.2.0 permanece local y **no se debe subir a GitHub hasta recibir aprobación expresa del propietario**. Sus resultados locales y cualquier CI histórica de 2.1.0 no acreditan una CI remota aprobada para 2.2.0. El despliegue real y la aceptación de sus controles operativos se registran por separado.
+La entrega 2.2.1 permanece local y su publicación en GitHub requiere aprobación expresa del propietario. Los resultados de 2.2.0 se conservan como antecedentes de aquella versión. Las pruebas de esta actualización y su alcance se registran en su entrega correspondiente. El despliegue real y la aceptación de sus controles operativos tienen sus propias comprobaciones.
 
 ## Pruebas reproducibles
 

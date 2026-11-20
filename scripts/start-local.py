@@ -60,7 +60,7 @@ try:
     ready(urls['identity']+'/.well-known/openid-configuration',identity)
     ruc = start('python-ruc',[settings['python'],'-m','uvicorn','ruc_service:app','--host','127.0.0.1','--port',str(ports['ruc']),'--no-access-log'],ROOT/'api-python',{'RUC_QUOTA_PATH':str(data/'ruc-quota.sqlite')})
     ready(urls['ruc']+'/health',ruc)
-    api = start('dotnet-api',[settings['dotnet'],str(ROOT/f'api-dotnet/bin/{args.configuration}/net10.0/Cotiza.Api.dll')],ROOT/'api-dotnet',{'ASPNETCORE_URLS':urls['api'],'DATABASE_PATH':str(data/'quotes.sqlite')})
+    api = start('dotnet-api',[settings['dotnet'],str(ROOT/f'api-dotnet/bin/{args.configuration}/net10.0/Cotiza.Api.dll')],ROOT/'api-dotnet',{'ASPNETCORE_URLS':urls['api'],'DATABASE_PATH':str(data/'quotes.sqlite'),'BACKUP_DIR':str(data/'backups'),'BACKUP_INTERVAL_HOURS':'24','BACKUP_KEEP':'7'})
     ready(urls['api']+'/health',api)
     web = start('next-typescript',[settings['node'],'node_modules/next/dist/bin/next','dev','--webpack','--hostname','127.0.0.1','--port',str(ports['web'])],ROOT/'web',{'DATABASE_PATH':str(data/'sessions.sqlite')})
     ready(urls['web']+'/cotizar',web)

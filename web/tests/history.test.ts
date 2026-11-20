@@ -39,6 +39,42 @@ test('history pages reject invalid containers and de-duplicate repeated entries'
   assert.equal(mergeHistoryEntries(page.entries,page.entries).length,1);
 });
 
+test('API 2.1 history without nextCursor accepts its bounded result during a staged deployment',()=>{
+  for(const count of [0,1,41,200]){
+    const rows=Array.from({length:count},(_,index)=>({
+      id:`api-21-${index}`,quote:fixture,totalCents:33984,createdAt:'2026-11-18T12:00:00.000Z',
+    }));
+    const page=parseHistoryPage({quotes:rows});
+    assert.equal(page.entries.length,count);
+    assert.equal(page.nextCursor,null);
+    assert.ok(page.entries.every(entry=>entry.kind==='current'));
+  }
+  assert.throws(()=>parseHistoryPage({quotes:Array(201).fill({})}));
+});
+
+test('compatibility with API 2.1 preserves row isolation and removes duplicate IDs',()=>{
+  const rows=[
+    {id:'valid',quote:fixture,totalCents:33984,createdAt:'2026-11-18T12:00:00.000Z'},
+    {id:'legacy',quote:{...fixture,projectType:'navidad'},totalCents:33984,createdAt:'2026-11-17T12:00:00.000Z'},
+    {id:'broken',quote:null,totalCents:null,createdAt:'2026-11-16T12:00:00.000Z'},
+    {id:'valid',quote:fixture,totalCents:33984,createdAt:'2026-11-18T12:00:00.000Z'},
+    null,
+  ];
+  const page=parseHistoryPage({quotes:rows});
+  assert.deepEqual(page.entries.map(entry=>entry.kind),['current','legacy','legacy']);
+  assert.equal(page.nextCursor,null);
+});
+
+test('a present pagination field continues to require the current cursor contract',()=>{
+  const rows=Array.from({length:21},(_,index)=>({id:`row-${index}`,quote:null}));
+  for(const nextCursor of [undefined,'','unknown','2026-11-18T12:00:00.000Z_00000000-0000-0000-0000-000000000001',42]){
+    assert.throws(()=>parseHistoryPage({quotes:[],nextCursor}));
+  }
+  assert.throws(()=>parseHistoryPage({quotes:rows,nextCursor:null}));
+  const cursor=encodeHistoryCursor({createdAt:'2026-11-18T12:00:00.000Z',id:'00000000-0000-0000-0000-000000000001'});
+  assert.equal(parseHistoryPage({quotes:[],nextCursor:cursor}).nextCursor,cursor);
+});
+
 test('history cursor is canonical, bounded and rejects duplicate query values',()=>{
   const record={createdAt:'2026-11-18T12:00:00.000Z',id:'00000000-0000-0000-0000-000000000001'};
   const cursor=encodeHistoryCursor(record);

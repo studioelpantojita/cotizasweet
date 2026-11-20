@@ -265,6 +265,8 @@ def run(mode,provider='standard'):
     processes=[]
     with isolated_directory() as temp:
         env={**{k:v for k,v in os.environ.items() if not k.lower().endswith('_proxy')},'OIDC_PROVIDER':provider,'OIDC_ISSUER':ISSUER,'OIDC_AUDIENCE':AUDIENCE,'OIDC_CLIENT_ID':CLIENT,'OIDC_CLIENT_SECRET':SECRET,'SESSION_SECRET':secrets.token_hex(32),'OIDC_ALLOW_LOCAL_HTTP':'true','APP_ENV':'development','ASPNETCORE_ENVIRONMENT':'Development','APP_ORIGIN':'http://127.0.0.1:3190','API_BACKEND':mode,'API_BASE_URL':'http://127.0.0.1:8190','NEXT_TELEMETRY_DISABLED':'1','NODE_ENV':'development','NEXT_DIST_DIR':'.next-test','RUC_PROVIDER':'demo','INTEGRATION_SERVICE_KEY':secrets.token_urlsafe(48),'RUC_SERVICE_URL':'http://127.0.0.1:8191'}
+        # Operator backup settings must never redirect a synthetic run into real storage.
+        env.update(BACKUP_DIR=str(Path(temp)/'automatic-backups'),BACKUP_INTERVAL_HOURS='2',BACKUP_KEEP='2')
         with open(Path(temp)/'services.log','w+') as log:
             try:
                 ruc=OwnedProcess([sys.executable,'-m','uvicorn','ruc_service:app','--host','127.0.0.1','--port','8191','--no-access-log'],cwd=ROOT/'api-python',env=env,stdout=log,stderr=log);processes.append(ruc);wait_http('http://127.0.0.1:8191/health',ruc)
@@ -273,6 +275,11 @@ def run(mode,provider='standard'):
                     env_api={**env,'DATABASE_PATH':str(Path(temp)/'api.sqlite'),'ASPNETCORE_URLS':'http://127.0.0.1:8190'}
                     command=[sys.executable,'-m','uvicorn','main:app','--host','127.0.0.1','--port','8190'] if mode=='python' else [os.environ.get('DOTNET_EXEC','dotnet'),str(ROOT/'api-dotnet/bin/Release/net10.0/Cotiza.Api.dll')]
                     proc=OwnedProcess(command,cwd=ROOT/('api-python' if mode=='python' else 'api-dotnet'),env=env_api,stdout=log,stderr=log);processes.append(proc);wait_http('http://127.0.0.1:8190/health',proc);api_checks('http://127.0.0.1:8190',provider=='google')
+                    if mode=='dotnet':
+                        snapshots=list((Path(temp)/'automatic-backups').glob('cotiza-*.sqlite'))
+                        check(len(snapshots)==1,'El API no aplicó su directorio de respaldo configurado')
+                        verified=subprocess.run([sys.executable,str(ROOT/'scripts/backup_sqlite.py'),'verify',str(snapshots[0])],capture_output=True,timeout=15)
+                        check(verified.returncode==0,'El respaldo configurado no es verificable con la herramienta operativa')
                 proc=OwnedProcess([os.environ.get('NODE_EXEC','node'),'node_modules/next/dist/bin/next','dev','--webpack','--hostname','127.0.0.1','--port','3190'],cwd=ROOT/'web',env={**env,'DATABASE_PATH':str(Path(temp)/'web.sqlite')},stdout=log,stderr=log);processes.append(proc);wait_http('http://127.0.0.1:3190/',proc);web_checks()
                 database=Path(temp)/('web.sqlite' if mode=='next' else 'api.sqlite')
                 seed_history(database,'page-alice')

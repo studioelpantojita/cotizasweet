@@ -73,6 +73,20 @@ try{
  const mp=await mobile.newPage();await mp.goto(origin+'/cotizar');await mp.locator('#client-document').waitFor();
  checked('Mobile form has no horizontal overflow',await mp.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  await mp.screenshot({path:resolve(artifacts,'mobile.png'),fullPage:true});await mobile.close();
+ // A new web may receive the bounded, unpaginated envelope while API 2.1 is still deployed.
+ const previousApiQuote=JSON.parse(readFileSync(resolve(root,'contracts/example-quote.json'),'utf8'));
+ const previousApiRows=Array.from({length:41},(_,index)=>({id:`api-21-${index}`,quote:{...previousApiQuote,client:`Compatibilidad API 2.1 ${String(index).padStart(2,'0')}`},totalCents:33984,createdAt:'2026-11-18T12:00:00.000Z'}));
+ const previousApiResponse=route=>route.request().method()==='GET'?route.fulfill({status:200,json:{quotes:previousApiRows}}):route.continue();
+ await page.route('**/api/quotes',previousApiResponse);
+ try{
+  await page.getByRole('tab',{name:'Presupuestos guardados'}).click();
+  await page.getByRole('heading',{name:'Compatibilidad API 2.1 00',exact:true}).waitFor();
+  checked('API 2.1 history without a cursor preserves its complete bounded result',await page.locator('.history-row').count()===41);
+  checked('API 2.1 history has no load-more action',await page.getByRole('button',{name:'Cargar más propuestas',exact:true}).count()===0);
+ }finally{
+  await page.unroute('**/api/quotes',previousApiResponse);
+  await page.getByRole('tab',{name:'Nueva cotización'}).click();
+ }
  // Historical RUC identity must remain available even when its provider is down.
  const ruc=JSON.parse(readFileSync(resolve(root,'contracts/example-quote.json'),'utf8'));
  Object.assign(ruc,{clientType:'empresa',documentType:'ruc',clientDocument:'20999999990',client:'RAZÓN SOCIAL HISTÓRICA QA'});

@@ -110,6 +110,19 @@ def evaluate(config: dict[str, str]) -> dict:
     quota_path = config.get('RUC_QUOTA_PATH', '')
     absolute_quota_path = PurePosixPath(quota_path).is_absolute() or PureWindowsPath(quota_path).is_absolute()
     check('ruc_quota_path', _set(quota_path) and absolute_quota_path, 'RUC_QUOTA_PATH debe ser la ruta absoluta al archivo SQLite de cuota dentro del volumen del servicio RUC.')
+    for key, minimum, maximum, default in (
+        ('BACKUP_INTERVAL_HOURS', 0, 168, 24),
+        ('BACKUP_KEEP', 1, 365, 7),
+    ):
+        raw_value = config.get(key, '')
+        # Python strips these controls, whereas .NET does not treat them as whitespace.
+        valid_controls = re.search(r'[\x1c-\x1f]', raw_value) is None
+        value = raw_value.strip()
+        valid = valid_controls and (not value or (re.fullmatch(r'[0-9]{1,4}', value) is not None and minimum <= int(value) <= maximum))
+        check(key.lower(), valid, f'{key} es opcional y debe ser un entero entre {minimum} y {maximum}; vacío usa {default}.')
+    backup_directory = config.get('BACKUP_DIR', '')
+    valid_directory = re.search(r'[\x1c-\x1f]', backup_directory) is None and (not backup_directory.strip() or not any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in backup_directory))
+    check('backup_dir', valid_directory, 'BACKUP_DIR es opcional y admite una ruta absoluta o relativa sin caracteres de control; vacío usa backups junto a DATABASE_PATH.')
     backend = config.get('API_BACKEND', '')
     check('api_backend', backend in ('next', 'dotnet', 'python'), 'API_BACKEND debe seleccionarse explícitamente.')
     if backend in ('dotnet', 'python'):

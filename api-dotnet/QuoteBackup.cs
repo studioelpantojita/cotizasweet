@@ -3,19 +3,56 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Configuration;
 
-public sealed class QuoteBackup(string databasePath)
+public sealed record BackupOptions(string Directory, TimeSpan Interval, int Keep)
 {
-    const int Retain = 7;
-    static readonly TimeSpan Interval = TimeSpan.FromHours(24);
+    public bool Enabled => Interval > TimeSpan.Zero;
+
+    public static BackupOptions From(IConfiguration configuration, string databasePath)
+    {
+        static int Number(string? value, int fallback, int minimum, int maximum, string name)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return fallback;
+            var text = value.Trim();
+            if (!Regex.IsMatch(text, "^[0-9]{1,4}$", RegexOptions.CultureInvariant) ||
+                !int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var number) ||
+                number < minimum || number > maximum)
+                throw new InvalidOperationException($"{name} debe ser un entero entre {minimum} y {maximum}.");
+            return number;
+        }
+
+        var hours = Number(configuration["BACKUP_INTERVAL_HOURS"], 24, 0, 168, "BACKUP_INTERVAL_HOURS");
+        var keep = Number(configuration["BACKUP_KEEP"], 7, 1, 365, "BACKUP_KEEP");
+        var directory = configuration["BACKUP_DIR"];
+        if (string.IsNullOrWhiteSpace(directory))
+            directory = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(databasePath))!, "backups");
+        if (directory.Any(char.IsControl))
+            throw new InvalidOperationException("BACKUP_DIR debe ser una ruta de directorio válida.");
+        try
+        {
+            return new BackupOptions(Path.GetFullPath(directory), TimeSpan.FromHours(hours), keep);
+        }
+        catch (Exception error) when (error is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new InvalidOperationException("BACKUP_DIR debe ser una ruta de directorio válida.");
+        }
+    }
+}
+
+public sealed class QuoteBackup(string databasePath, BackupOptions? configuredOptions = null)
+{
+    readonly BackupOptions options = configuredOptions ?? BackupOptions.From(new ConfigurationBuilder().Build(), databasePath);
     static readonly Regex OwnedFile = new(@"\Acotiza-([0-9]{8}T[0-9]{9}Z)-[a-f0-9]{32}\.sqlite\z",
         RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
     readonly string database = Path.GetFullPath(databasePath);
+    public bool Enabled => options.Enabled;
 
     public bool CreateIfDue(DateTimeOffset now)
     {
+        if (!Enabled) return false;
         now = now.ToUniversalTime();
-        var directory = Path.Combine(Path.GetDirectoryName(database)!, "backups");
+        var directory = options.Directory;
         Directory.CreateDirectory(directory);
         if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
             throw new IOException("El directorio de respaldos no puede ser un enlace.");
@@ -28,7 +65,7 @@ public sealed class QuoteBackup(string databasePath)
             throw new IOException("El archivo del planificador no puede ser un enlace.");
         using var gate = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var complete = Snapshots(directory).ToArray();
-        if (complete.Length > 0 && now - complete[0].Time < Interval)
+        if (complete.Length > 0 && now - complete[0].Time < options.Interval)
         {
             Prune(complete);
             return false;
@@ -154,9 +191,9 @@ public sealed class QuoteBackup(string databasePath)
         }
     }
 
-    static void Prune(IEnumerable<(string Path, DateTimeOffset Time)> complete)
+    void Prune(IEnumerable<(string Path, DateTimeOffset Time)> complete)
     {
-        foreach (var (path, _) in complete.Skip(Retain))
+        foreach (var (path, _) in complete.Skip(options.Keep))
         {
             File.Delete(path + ".metadata.json");
             File.Delete(path);
@@ -169,6 +206,11 @@ public sealed class QuoteBackupWorker(QuoteBackup backup, TimeProvider clock, IL
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!backup.Enabled)
+        {
+            logger.LogInformation("El respaldo automático está desactivado en la configuración.");
+            return;
+        }
         using var timer = new PeriodicTimer(TimeSpan.FromHours(1), clock);
         try
         {
@@ -180,10 +222,14 @@ public sealed class QuoteBackupWorker(QuoteBackup backup, TimeProvider clock, IL
                     if (backup.CreateIfDue(clock.GetUtcNow()))
                         logger.LogInformation("Se completó el respaldo automático de cotizaciones.");
                 }
-                catch (Exception error) when (error is IOException or UnauthorizedAccessException or SqliteException || error is InvalidDataException)
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception error)
                 {
                     // Paths and exception messages may contain private deployment information.
-                    logger.LogWarning("Falló el respaldo automático. Revisa permisos, espacio e integridad del volumen.");
+                    logger.LogWarning("Falló el respaldo automático ({FailureType}). Se reintentará en la próxima comprobación.", error.GetType().Name);
                 }
             } while (await timer.WaitForNextTickAsync(stoppingToken));
         }

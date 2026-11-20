@@ -29,8 +29,14 @@ function parseHistoryRow(value: unknown): HistoryEntry | null {
 
 export function parseHistoryPage(value: unknown): HistoryPage {
   const page = asObject(value);
-  if (!page || !Array.isArray(page.quotes) || page.quotes.length > 20 ||
-      (page.nextCursor !== null && (typeof page.nextCursor !== 'string' || !/^v1\.[A-Za-z0-9_-]{82}$/.test(page.nextCursor)))) {
+  if (!page || !Array.isArray(page.quotes)) {
+    throw new Error('No se pudo cargar el historial.');
+  }
+  // API 2.1 returns at most 200 rows and omits the pagination field.
+  const paginated = Object.hasOwn(page, 'nextCursor');
+  const nextCursor = paginated ? page.nextCursor : null;
+  if (page.quotes.length > (paginated ? 20 : 200) ||
+      (nextCursor !== null && (typeof nextCursor !== 'string' || !/^v1\.[A-Za-z0-9_-]{82}$/.test(nextCursor)))) {
     throw new Error('No se pudo cargar el historial.');
   }
   const entries: HistoryEntry[] = [];
@@ -38,7 +44,7 @@ export function parseHistoryPage(value: unknown): HistoryPage {
     const entry = parseHistoryRow(row);
     if (entry) entries.push(entry);
   }
-  return {entries:mergeHistoryEntries([], entries),nextCursor:page.nextCursor};
+  return {entries:mergeHistoryEntries([], entries),nextCursor};
 }
 
 export function mergeHistoryEntries(current: HistoryEntry[], page: HistoryEntry[]): HistoryEntry[] {

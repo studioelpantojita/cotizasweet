@@ -72,7 +72,7 @@ def main(build=False):
             volume=PREFIX+'-'+label;docker('volume','create',volume);owned_volumes.append(volume)
         ruc=start('ruc',images['ruc'],'8389:8000',['APP_ENV=production','RUC_PROVIDER=disabled','OIDC_ALLOW_LOCAL_HTTP=false','RUC_QUOTA_PATH=/app/data/ruc-quota.sqlite'],owned_volumes[2],'api-python')
         ready('http://127.0.0.1:8389/health')
-        api=start('api',images['api'],'8388:8000',['ASPNETCORE_ENVIRONMENT=Production','OIDC_ISSUER=https://oidc.invalid','OIDC_AUDIENCE=cotizasweet-test','OIDC_ALLOW_LOCAL_HTTP=false','RUC_SERVICE_URL=http://api-python:8000'],owned_volumes[1],'api-dotnet')
+        api=start('api',images['api'],'8388:8000',['ASPNETCORE_ENVIRONMENT=Production','OIDC_ISSUER=https://oidc.invalid','OIDC_AUDIENCE=cotizasweet-test','OIDC_ALLOW_LOCAL_HTTP=false','RUC_SERVICE_URL=http://api-python:8000','BACKUP_DIR=/app/data/backup-smoke','BACKUP_INTERVAL_HOURS=2','BACKUP_KEEP=2'],owned_volumes[1],'api-dotnet')
         ready('http://127.0.0.1:8388/health')
         web=start('web',images['web'],'3388:3000',['NODE_ENV=production','APP_ORIGIN=https://smoke.invalid','API_BACKEND=dotnet','API_BASE_URL=http://api-dotnet:8000','OIDC_ISSUER=https://oidc.invalid','OIDC_ALLOW_LOCAL_HTTP=false'],owned_volumes[0])
         ready('http://127.0.0.1:3388/api/health')
@@ -101,9 +101,11 @@ def main(build=False):
         before_ruc=int(docker('exec',ruc,'python','-c',quota_read))
         docker('restart',ruc);ready('http://127.0.0.1:8389/health')
         assert int(docker('exec',ruc,'python','-c',quota_read))==before_ruc==1
-        snapshots=docker('exec',api,'find','/app/data/backups','-name','cotiza-*.sqlite').splitlines()
+        snapshots=docker('exec',api,'find','/app/data/backup-smoke','-name','cotiza-*.sqlite').splitlines()
         assert len(snapshots)==1,'Automatic API backup must exist after startup'
-        result.update(status='passed',services=3,volumes=3,application_uids=users,persistent_web_quota=True,persistent_ruc_daily_quota=True,automatic_api_backup=True,api_volume_restart=True,anonymous_quotes=401,ruc_without_credentials=401,ruc_cross_site_guard=403,ruc_disabled=503)
+        metadata=json.loads(docker('exec',api,'cat',snapshots[0]+'.metadata.json'))
+        assert metadata['sqliteIntegrity']=='ok' and re.fullmatch('[a-f0-9]{64}',metadata['sha256'])
+        result.update(status='passed',services=3,volumes=3,application_uids=users,persistent_web_quota=True,persistent_ruc_daily_quota=True,automatic_api_backup=True,configured_api_backup=True,api_volume_restart=True,anonymous_quotes=401,ruc_without_credentials=401,ruc_cross_site_guard=403,ruc_disabled=503)
     except Exception as error:
         result['error']=diagnostic(type(error).__name__+': '+str(error))
         raise

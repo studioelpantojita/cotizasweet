@@ -1,6 +1,6 @@
-# Despliegue de E&A Cotiza 2.2.0
+# Despliegue de E&A Cotiza 2.2.1
 
-Guía revisada el 19 de noviembre de 2026 para la copia local 2.2.0. La publicación en GitHub y la continuación del despliegue quedan pendientes de la aprobación expresa del propietario. Los resultados de versiones anteriores se conservan en [UPGRADE-2.1.md](UPGRADE-2.1.md) y [VALIDACION-V2.md](VALIDACION-V2.md). [RAILWAY.md](RAILWAY.md) contiene la receta del alojamiento elegido y [REVISION-MANUAL-2.2.md](REVISION-MANUAL-2.2.md) permite revisar la entrega desde Visual Studio.
+Guía revisada el 20 de noviembre de 2026 para la copia local 2.2.1. La publicación en GitHub y la continuación del despliegue quedan pendientes de la aprobación expresa del propietario. Los resultados de versiones anteriores se conservan en [UPGRADE-2.1.md](UPGRADE-2.1.md) y [VALIDACION-V2.md](VALIDACION-V2.md). [RAILWAY.md](RAILWAY.md) contiene la receta del alojamiento elegido y [REVISION-MANUAL-2.2.1.md](REVISION-MANUAL-2.2.1.md) permite revisar la entrega desde Visual Studio.
 
 Railway es el destino preparado para el piloto, con un presupuesto máximo de **US$30 mensuales**. La activación del plan, los controles de gasto efectivos, la región, el dominio, los secretos y la aceptación del servicio público requieren comprobarse en la cuenta. El repositorio existente es [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet). La CI remota de esta versión se ejecutará después de recibir aprobación para publicar su código.
 
@@ -12,9 +12,9 @@ La aplicación requiere procesos Next.js, ASP.NET Core .NET 10 y Python 3.12 y a
 | `api-dotnet` | Validación, cálculo, historial y copias automáticas | `dotnet-data` | `quotes-data` |
 | `api-python` | Servicio RUC y contador diario persistente | `python-data` | `ruc-data` |
 
-Cada volumen se monta en `/app/data`. Los builds usan la raíz completa del monorepo porque comparten `contracts/`. En el destino se expone `web` por HTTPS y las API se comunican por la red privada. Compose liga la web a `127.0.0.1:3000` para un proxy del servidor. La copia de revisión de este ordenador usa los puertos 3350, 8350, 8351 y 9350, guardados en su configuración privada.
+Cada volumen se monta en `/app/data`. Los builds usan la raíz completa del monorepo porque comparten `contracts/`. En el destino se expone `web` por HTTPS y las API se comunican por la red privada. Compose liga la web a `127.0.0.1:3000` para un proxy del servidor. Los puertos de cada copia de revisión se consultan en su archivo privado `local.settings.json`.
 
-Las tres imágenes de producción se construyeron y aprobaron el smoke local ejecutado por el propietario desde PowerShell con acceso a Docker Desktop. `tests/artifacts/container-smoke.json` registra tres servicios y tres volúmenes, UID finales de aplicación 1000 para web, 1654 para .NET y 10001 para RUC, persistencia de cuota web y RUC, respaldo automático .NET y persistencia al reiniciar la API. El recorrido usa configuración e identidades sintéticas. La comprobación de la infraestructura en Railway se completa en el destino efectivo.
+Las tres imágenes de producción de 2.2.1 se construyeron y aprobaron el smoke local ejecutado por el propietario desde PowerShell con acceso a Docker Desktop. Se revisó `tests/artifacts/container-smoke.json`, cuyo resultado registra tres servicios y tres volúmenes, UID finales de aplicación 1000 para web, 1654 para .NET y 10001 para RUC, persistencia de cuota web y RUC, respaldo automático en un directorio personalizado y persistencia al reiniciar la API. El recibo externo de entrega identifica el commit local y sus evidencias. El recorrido usa configuración e identidades sintéticas. La comprobación de la infraestructura en Railway se completa en el destino efectivo.
 
 La configuración privada parte de `.env.example` y del gestor de secretos del alojamiento. Registra los siguientes valores para el entorno.
 
@@ -33,6 +33,9 @@ La configuración privada parte de `.env.example` y del gestor de secretos del a
 | `RUC_PROVIDER`, `RUC_API_TOKEN` | Decolecta y una credencial nueva y vigente, conservada exclusivamente en Python |
 | `RUC_DAILY_LIMIT` | Entero de 1 a 100000, predeterminado 500 |
 | `RUC_QUOTA_PATH` | Ruta absoluta `/app/data/ruc-quota.sqlite` dentro del volumen Python |
+| `BACKUP_INTERVAL_HOURS` | Opcional, predeterminado `24`, entero de 0 a 168. `0` desactiva el respaldo automático .NET |
+| `BACKUP_KEEP` | Opcional, predeterminado `7`, entero de 1 a 365 para las copias completas válidas |
+| `BACKUP_DIR` | Opcional, predeterminado `backups/` junto a la base .NET. Admite ruta absoluta o relativa canonicalizada por el servicio |
 | Identidad comercial y condiciones | Datos, precios, disponibilidad, políticas y derechos confirmados por el responsable |
 
 [GOOGLE.md](GOOGLE.md) explica el registro del cliente web y sus pruebas de aceptación. Google valida la identidad y E&A Cotiza asigna los permisos internos para el historial propio. Para otro proveedor, `OIDC_PROVIDER=standard` requiere los scopes `openid profile email quotes:read quotes:write` y un access token RS256 con la audiencia del API. [AUTENTICACION.md](AUTENTICACION.md) describe ambos perfiles.
@@ -58,7 +61,9 @@ La puesta en servicio se acepta con esta secuencia.
 
 El preflight comprueba la configuración de forma estática. DNS, certificados, credenciales, políticas del proveedor y comportamiento del alojamiento se verifican durante los recorridos del destino.
 
-El trabajador .NET comprueba al arrancar y cada hora si corresponde crear una copia de la base de cotizaciones. Usa la API online SQLite, comprueba integridad, genera metadatos y conserva las siete copias completas válidas más recientes con intervalo mínimo de 24 horas. Las copias quedan junto a la base en el mismo volumen. [OPERACIONES.md](OPERACIONES.md) documenta SHA-256, recuperación mediante Python y las bases adicionales que el operador debe respaldar.
+El trabajador .NET comprueba al arrancar y cada hora si corresponde crear una copia de la base de cotizaciones, consultando las copias válidas existentes tras un reinicio. Usa la API online SQLite, comprueba integridad, genera metadatos y aplica el intervalo y la retención configurados. Los valores predeterminados son 24 horas y siete copias completas válidas. `BACKUP_DIR` selecciona la ubicación y debe apuntar al almacenamiento preparado por el operador. En Railway, las tres opciones pueden definirse como variables de `api-dotnet`; omitirlas conserva los valores predeterminados de la aplicación. Los errores de una operación se registran por su tipo y el trabajador reintenta en el ciclo siguiente. [OPERACIONES.md](OPERACIONES.md) documenta SHA-256, bloqueo entre procesos, recuperación mediante Python y las bases adicionales que el operador debe respaldar.
+
+La web 2.2.1 acepta temporalmente la respuesta de historial de la API 2.1 que contiene `quotes` y carece de `nextCursor`, hasta el límite anterior de 200 registros. En ese caso muestra el historial recibido sin una página siguiente. Las respuestas del contrato actual mantienen páginas de 20 y cursor `v1`. Tras actualizar los servicios, verifica la paginación completa y el aislamiento con dos cuentas.
 
 Antes de cambiar versión, conserva un artefacto identificable y respaldos verificados. Para revertir, detén las escrituras y selecciona el artefacto previo con una base compatible. Restaura los datos a una ruta nueva, comprueba contenido e integridad y configura explícitamente `DATABASE_PATH` al reiniciar. La recuperación del estado cifrado de sesión requiere el mismo `SESSION_SECRET`. Las sesiones caducadas conservan esa caducidad y una rotación de clave obliga a iniciar sesión de nuevo.
 

@@ -51,6 +51,9 @@ services:
       INTEGRATION_SERVICE_KEY: ${INTEGRATION_SERVICE_KEY}
       OIDC_ALLOW_LOCAL_HTTP: 'false'
       DATABASE_PATH: /app/data/dotnet.sqlite
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      BACKUP_DIR: ${BACKUP_DIR:-/app/data/backups}
       RUC_SERVICE_URL: http://api-python:8000
     volumes: ['dotnet-data:/app/data']
     restart: unless-stopped

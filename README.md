@@ -1,18 +1,18 @@
-# E&A Cotiza 2.2.0
+# E&A Cotiza 2.2.1
 
 ![E&A Cotiza](web/public/brand/eacotiza-horizontal-granate.svg)
 
 Plataforma de cotización de pastelería del proyecto CotizaSweet, con Next.js/TypeScript, ASP.NET Core .NET 10 y Python 3.12. Permite consultar el catálogo, preparar propuestas, generar PDF y conservar un historial por cuenta. Esta versión incorpora la marca E&A Cotiza y los cambios derivados del informe técnico del 13 de noviembre de 2026.
 
-Esta entrega 2.2.0 se prepara y valida localmente. Su publicación en el repositorio personal [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet) queda pendiente de la aprobación expresa del propietario. Las comprobaciones de esta entrega deben vincularse a la copia o commit y a sus artefactos. Los resultados anteriores están documentados en [VALIDACION-V2.md](docs/VALIDACION-V2.md) y [UPGRADE-2.1.md](docs/UPGRADE-2.1.md), como antecedentes de sus respectivas versiones.
+La actualización 2.2.1 incorpora opciones de respaldo, recuperación del planificador y compatibilidad con el historial de la API 2.1. Su alcance y pruebas se documentan en [UPGRADE-2.2.1.md](docs/UPGRADE-2.2.1.md). Esta entrega se prepara y valida localmente. Su publicación en el repositorio personal [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet) queda pendiente de la aprobación expresa del propietario. Las comprobaciones de esta entrega deben vincularse a la copia o commit y a sus artefactos. Los resultados anteriores están documentados en [VALIDACION-V2.md](docs/VALIDACION-V2.md) y [UPGRADE-2.1.md](docs/UPGRADE-2.1.md), como antecedentes de sus respectivas versiones.
 
-## Cambios de 2.2.0
+## Capacidades de esta versión
 
 - Marca vectorial en cabeceras, pie, catálogo y PDF, tipografía local DM Sans y favicon específico de 16 × 16 px. La identidad referencial del negocio en la cotización sigue identificada como **Dulce Atelier** y datos de muestra.
 - Historial con páginas de 20 y cursor estable en los tres backends. Cada fila se valida por separado y los registros de versiones anteriores se identifican para que puedan revisarse conservando las propuestas compatibles.
 - Consulta RUC con guardia de origen del navegador, caché, agrupación de solicitudes concurrentes y cuota diaria persistente. El límite predeterminado de 500 reservas de consulta se cuenta por día de Perú y antes de contactar a Decolecta, incluidos los intentos que terminen con error.
 - CSP con nonce por respuesta y HSTS, junto con las defensas de cookies, origen, permisos y aislamiento del historial. El perfil de inicio de sesión Google está documentado en [GOOGLE.md](docs/GOOGLE.md).
-- Respaldo automático de la base de cotizaciones .NET cada 24 horas, con comprobación horaria, integridad SQLite y conservación de las siete copias completas más recientes.
+- Respaldo automático de la base de cotizaciones .NET con directorio, intervalo y retención configurables. Por defecto comprueba cada hora, crea una copia cada 24 horas y conserva las siete copias completas válidas más recientes.
 - Infraestructura Railway actualizada a **tres servicios y tres volúmenes**, incluido el contador persistente de cuota RUC. La definición selecciona Google como perfil OIDC predeterminado.
 
 ## Preparar la ejecución local en Windows
@@ -22,10 +22,12 @@ Instala Node.js 24 o posterior, Python 3.12 o posterior y .NET SDK 10. Comprueba
 Desde la raíz de esta copia ejecuta lo siguiente.
 
 ```powershell
-.\scripts\setup-local.ps1 -NodePath node -PythonPath python -DotnetPath dotnet -InstallBrowsers
+.\scripts\setup-local.ps1 -NodePath node -PythonPath python -DotnetPath dotnet -WebPort 3360 -ApiPort 8360 -RucPort 8361 -IdentityPort 9360 -InstallBrowsers
 ```
 
 El script crea el entorno `.venv`, instala dependencias, restaura la solución con los archivos de bloqueo y genera `local.settings.json`. `-InstallBrowsers` instala Chromium para las pruebas automatizadas. Las rutas y los puertos locales quedan en ese archivo privado.
+
+El comando anterior prepara los puertos de la revisión 2.2.1. Consulta [REVISION-MANUAL-2.2.1.md](docs/REVISION-MANUAL-2.2.1.md) para acceder a esta copia independiente y registrar observaciones.
 
 Abre **INICIAR-EN-VISUAL-STUDIO.slnx**, elige **EA.Cotiza.Local** como proyecto de inicio y pulsa F5. La solución incluye el lanzador y la API para que ambos proyectos se compilen. Ante un error de compilación, revisa la salida y recompila la solución completa antes de iniciar una nueva instancia.
 
@@ -58,7 +60,7 @@ El servicio conserva el contador en `RUC_QUOTA_PATH`. El lanzador usa `data/ruc-
 
 Dulce Atelier, sus contactos, los precios, la disponibilidad, las condiciones y las imágenes siguen siendo referenciales y deben completarse con información confirmada por el responsable. La cuenta del usuario identifica el propietario de cada cotización. El historial puede contener documentos, correo y teléfono que el operador debe incluir en su aviso de privacidad y su política de retención.
 
-El servicio .NET comprueba al iniciar y cada hora si corresponde un respaldo. Cuando han pasado al menos 24 horas desde la última copia completa, crea otra con la API SQLite, verifica integridad y genera metadatos de tamaño y SHA-256. Conserva siete copias completas en `backups/` junto a la base del volumen. Esta retención se expresa en copias y depende de que el servicio esté en ejecución.
+El servicio .NET comprueba al iniciar y cada hora si corresponde un respaldo. Las opciones `BACKUP_DIR`, `BACKUP_INTERVAL_HOURS` y `BACKUP_KEEP` permiten elegir destino, intervalo y retención. Sus valores predeterminados crean una copia cada 24 horas y conservan siete copias completas en `backups/` junto a la base del volumen. Cada copia se crea con la API SQLite, se verifica y recibe metadatos de tamaño y SHA-256. Esta retención se expresa en copias y depende de que el servicio esté en ejecución. Un fallo en la operación se registra y se reintenta en la siguiente comprobación.
 
 La copia externa de los respaldos sigue pendiente de configurar en el alojamiento. El operador debe ensayar la restauración a una ruta nueva y documentar periodicidad, retención, permisos y recuperación de los tres volúmenes. Los comandos están en [OPERACIONES.md](docs/OPERACIONES.md).
 
@@ -96,7 +98,7 @@ Desde la raíz se verifican además el catálogo, el PDF, la configuración y la
 .\.venv\Scripts\python.exe scripts/audit_nuget.py
 ```
 
-Los informes de ejecución, las capturas y los PDF sintéticos permiten revisar los resultados de cada copia o commit. Las auditorías de dependencias consultan las fuentes de avisos vigentes en el momento de ejecutar. Las pruebas financieras, de mutación, concurrencia y durabilidad se describen en [tests/v2/README.md](tests/v2/README.md). La aceptación del acceso real de Google requiere el cliente registrado y las cuentas del propietario según [GOOGLE.md](docs/GOOGLE.md). El acta debe identificar los controles locales ejecutados, los resultados Docker conservados en la evidencia local y las limitaciones pendientes. La CI remota de 2.2.0 queda pendiente de publicación y ejecución.
+Los informes de ejecución, las capturas y los PDF sintéticos permiten revisar los resultados de cada copia o commit. Las auditorías de dependencias consultan las fuentes de avisos vigentes en el momento de ejecutar. Las pruebas financieras, de mutación, concurrencia y durabilidad se describen en [tests/v2/README.md](tests/v2/README.md). La aceptación del acceso real de Google requiere el cliente registrado y las cuentas del propietario según [GOOGLE.md](docs/GOOGLE.md). El acta debe identificar los controles locales ejecutados, los resultados Docker conservados en la evidencia local y las limitaciones pendientes. La CI remota de esta entrega queda pendiente de publicación y ejecución.
 
 ## Publicación funcional
 
@@ -104,4 +106,4 @@ Railway es el destino preparado para el piloto. Esta entrega permanece local has
 
 [RAILWAY.md](docs/RAILWAY.md) describe los tres servicios y tres volúmenes, las variables y la secuencia de publicación. [DESPLIEGUE.md](docs/DESPLIEGUE.md) y [OPERACIONES.md](docs/OPERACIONES.md) reúnen los requisitos de operación y reversión. Antes de aplicar infraestructura, revisa el commit, sus comprobaciones y el plan concreto del entorno.
 
-La revisión local de esta entrega se documenta en [AUDITORIA-2.2.md](docs/AUDITORIA-2.2.md), con resultados ejecutados, alcance y requisitos externos pendientes. El acceso preparado en este equipo utiliza [REVISION-MANUAL-2.2.md](docs/REVISION-MANUAL-2.2.md).
+La revisión local de esta entrega se documenta en [UPGRADE-2.2.1.md](docs/UPGRADE-2.2.1.md), con resultados ejecutados, alcance y requisitos externos pendientes. [AUDITORIA-2.2.md](docs/AUDITORIA-2.2.md) conserva la evidencia de la versión 2.2.0. La copia 2.2.1 preparada en este equipo utiliza el puerto 3360 y su ficha privada `.local/ACCESO_LOCAL_PRIVADO.html`.
