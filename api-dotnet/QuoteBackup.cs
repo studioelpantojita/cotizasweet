@@ -96,7 +96,9 @@ public sealed class QuoteBackupService(QuoteStore store,BackupOptions options,IL
             try {
                 var file=QuoteBackup.RunOnce(store.DatabasePath,options,DateTime.UtcNow);
                 logger.LogInformation("Respaldo verificado: {File}; se conservan {Keep}.",Path.GetFileName(file),options.Keep);
-            } catch(Exception e) when(e is IOException or SqliteException or InvalidDataException or UnauthorizedAccessException) {
+            } catch(Exception e) {
+                // Log and retry next interval: an unhandled exception in a BackgroundService
+                // stops the whole host by default (.NET 8+), which would take the API down.
                 logger.LogError("Falló el respaldo automático: {Reason}",e.GetType().Name);
             }
             try{await Task.Delay(options.Interval,stopping);}catch(OperationCanceledException){return;}
