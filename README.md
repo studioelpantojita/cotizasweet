@@ -28,7 +28,9 @@ Instala Node.js 24 o posterior, Python 3.12 o posterior y .NET SDK 10. Para util
 .\scripts\setup-local.ps1 -NodePath node -PythonPath python -DotnetPath dotnet
 ```
 
-El script comprueba los runtimes, crea `.venv`, instala dependencias, restaura .NET con sus archivos de bloqueo y genera `local.settings.json`. Si tienes varios ejecutables instalados, utiliza sus rutas en los parámetros. No es necesario cambiar políticas de seguridad del sistema. La preparación necesita acceso a los registros de dependencias.
+El script comprueba los runtimes, crea `.venv`, instala dependencias, restaura .NET con sus archivos de bloqueo y genera `local.settings.json`. Si tienes varios ejecutables instalados, utiliza sus rutas en los parámetros. No es necesario cambiar políticas de seguridad del sistema. La preparación necesita acceso a los registros de dependencias. Añade `-InstallBrowsers` para descargar también el Chromium de Playwright (unos 150 MB) que usan las pruebas en navegador.
+
+Para ejecutar todas las pruebas de backend del CI en local, con integración real y navegador, usa `.\scripts\test-backend.ps1 -Integration -Browser`. Necesita unos 2 GB de RAM libres; `-SkipBuild` reutiliza la compilación Release.
 
 Abre `INICIAR-EN-VISUAL-STUDIO.slnx` en Visual Studio, establece **EA.Cotiza.Local** como proyecto de inicio si se solicita y pulsa **F5**. Para explorar todos los componentes puedes abrir `EA-Cotiza.slnx`. Como alternativa, desde PowerShell:
 
@@ -63,7 +65,7 @@ Se conservan PEN y USD sin conversión automática, anticipo editable, recojo/en
 
 La identidad comercial referencial, contactos, precios de muestra, disponibilidad, condiciones, imágenes y derechos de uso requieren confirmación. Las fotografías de la cartera son referencias para definir servicios a medida; no acreditan stock, certificaciones alimentarias ni tarifas. No se incorporan cobros, facturación electrónica o políticas comerciales nuevas.
 
-El historial muestra las últimas **200 cotizaciones**. Su paginación y la recuperación individual ante una fila histórica corrupta quedan pendientes. Las cotizaciones están en SQLite sin cifrado de aplicación; protege los volúmenes y respaldos. El estado de sesión sí se cifra, con un propósito diferente.
+El historial se carga de 20 en 20 con **Cargar más propuestas**. Una propuesta que ya no cumple las reglas actuales aparece marcada como no disponible sin ocultar las demás. El API .NET crea copias diarias verificadas de su base (ver [operaciones](docs/OPERACIONES.md)). Las cotizaciones están en SQLite sin cifrado de aplicación; protege los volúmenes y respaldos. El estado de sesión sí se cifra, con un propósito diferente.
 
 ## Repetir las comprobaciones
 

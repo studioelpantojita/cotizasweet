@@ -16,6 +16,8 @@ Los contadores se conservan en SQLite, tabla `request_limits`, con ventana fija 
 
 El límite global se aplica siempre. Por defecto no se confía en cabeceras de dirección enviadas por el cliente, por lo que se aplica únicamente ese tope global. Detrás de un proxy bajo control del operador, se puede establecer `TRUSTED_CLIENT_IP_HEADER` a `x-real-ip`, `x-forwarded-for` o `cf-connecting-ip`. El proxy **debe borrar y reemplazar** la cabecera de entrada por la dirección real; en `x-forwarded-for` se usa el primer elemento. El servicio web no debe tener una vía pública que omita ese proxy. Una cabecera ausente o inválida solo recibe el control global.
 
+Las consultas RUC iniciadas por otro sitio desde el navegador de un visitante (`Sec-Fetch-Site` distinto de `same-origin` o `none`) se rechazan con HTTP 403 antes de consumir cupo. Además, el servicio Python, único que llama al proveedor de pago, aplica `RUC_DAILY_LIMIT` (500 por defecto) consultas reales por día calendario de Perú; las respuestas en caché y las solicitudes agrupadas no lo consumen. Al agotarse responde HTTP 429 con `Retry-After` hasta la medianoche. El contador es por instancia y se reinicia con el servicio.
+
 Los rechazos devuelven HTTP 429, `Retry-After` en segundos y `Cache-Control: no-store`. Los límites son deliberadamente conservadores para una instalación pequeña. Un atacante puede consumir el cupo global y afectar temporalmente a otros usuarios: no es una mitigación completa de denegación de servicio. En producción deben dimensionarse estos valores según tráfico, añadirse límites en el proxy y usarse un almacén compartido si hay varias réplicas con bases separadas.
 
 ## Identidad RUC al abrir borradores e historial

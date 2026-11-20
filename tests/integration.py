@@ -112,6 +112,18 @@ def api_checks(base):
             check(r.json()['quote']['currency']==case['quote'].get('currency','PEN'),'No conserva moneda')
         check(len(client.get('/api/quotes',headers=auth).json()['quotes'])==sum(c['quote']['pricingVersion']==2 for c in cases),'Historial incorrecto')
         check(client.get('/api/quotes',headers={'Authorization':'Bearer '+token('bob')}).json()['quotes']==[],'Fuga entre usuarios')
+        # Pagination: walk one by one through the cursor and compare with the full first page.
+        full=client.get('/api/quotes',headers=auth).json();check(full['nextCursor'] is None,'Historial pequeño no debe tener más páginas')
+        seen,cursor,pages=[],None,0
+        while True:
+            page=client.get('/api/quotes',params={'limit':'1',**({'before':cursor} if cursor else {})},headers=auth)
+            check(page.status_code==200 and len(page.json()['quotes'])<=1,'Paginación falla o ignora limit: '+page.text)
+            seen+=[q['id'] for q in page.json()['quotes']];cursor=page.json()['nextCursor'];pages+=1
+            if not cursor or pages>50:break
+        check(seen==[q['id'] for q in full['quotes']] and len(seen)>1,'Las páginas no coinciden con el historial')
+        check(client.get('/api/quotes',params={'limit':'1'},headers={'Authorization':'Bearer '+token('bob')}).json()=={'quotes':[],'nextCursor':None},'Paginación filtra entre usuarios')
+        for bad in [{'limit':'0'},{'limit':'51'},{'limit':'abc'},{'before':'x'},{'before':"2026-01-01T00:00:00.000Z_' OR 1=1"}]:
+            check(client.get('/api/quotes',params=bad,headers=auth).status_code==400,'Acepta paginación inválida: '+str(bad))
         for patch in [{'formVersion':1,'contact':'','event':''},{'client':'   '},{'items':[{**quote['items'][0],'name':'   '}]},{'documentType':'ruc','clientType':'empresa','clientDocument':'00000000000'},{'validUntil':'2026-11-20'},{'taxPercent':0},{'deliveryCents':100},{'clientDocument':'1'},{'clientEmail':'invalid'},{'locationMode':'on_location','provinceId':'1501','districtId':'010101'},{'items':[]},{'locationMode':'on_location','provinceId':'1501','districtId':'150130','address':'   '},{'advancePercent':101},{'advancePercent':12.5},{'items':[{**quote['items'][0],'quantity':1.5}]},{'items':[{**quote['items'][0],'priceCents':123.4}]}]:
             r=client.post('/api/quotes',json={**quote,**patch},headers=auth);check(r.status_code==400,'API acepta dato inválido: '+str(patch))
         wrong=json.loads(json.dumps(quote));wrong['materials'][0]['configuration']['selections']={'sweetener':['Miel','Sin endulzante añadido']}
@@ -177,6 +189,7 @@ def web_checks():
         check(r.json()['totalCents']==33984,'BFF importe incorrecto')
         check(len(a.get('/api/quotes').json()['quotes'])==1,'BFF historial incorrecto')
         check(b.get('/api/quotes').json()['quotes']==[],'BFF fuga entre cuentas')
+        check(a.get('/api/quotes',params={'limit':'abc'}).status_code==400 and a.get('/api/quotes',params={'limit':'1'}).json()['nextCursor'] is None,'BFF no valida o no reenvía la paginación')
         for patch in [{'currency':'EUR'},{'currency':None},{'contact':'90000000'},{'contact':'9000000000'},{'contact':'90000000x'}]:
             check(a.post('/api/quotes/validate',json={**quote,**patch},headers={'Origin':origin}).status_code==400,'BFF permite moneda o contacto inválido')
         usd=a.post('/api/quotes',json={**quote,'currency':'USD','contact':'+51 900000000'},headers={'Origin':origin})

@@ -15,7 +15,7 @@ export async function GET(request:Request) {
     const params:Record<string,string>={redirect_uri:`${appOrigin()}/auth/callback`,scope,state,nonce,code_challenge:await oidc.calculatePKCECodeChallenge(verifier),code_challenge_method:'S256'};
     if(process.env.OIDC_AUDIENCE)params.audience=process.env.OIDC_AUDIENCE;
     const response=NextResponse.redirect(oidc.buildAuthorizationUrl(config,params));
-    response.cookies.set(cookieName('login'),putState('login',{verifier,state,nonce},600),cookieOptions(600));
+    response.cookies.set(cookieName('login'),putState('login',{verifier,state,nonce,scope},600),cookieOptions(600));
     response.headers.set('Cache-Control','no-store');
     return response;
   }catch{return NextResponse.json({error:'El inicio de sesión no está configurado o el proveedor no está disponible. Contacta al administrador.'},{status:503,headers:{'Cache-Control':'no-store'}});}

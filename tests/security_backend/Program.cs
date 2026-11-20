@@ -1,4 +1,9 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Data.Sqlite;
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Configuration;
@@ -59,6 +64,51 @@ foreach(var mutate in new Action<JsonObject>[] {
     var rejected=false;try{QuoteDomain.Validate(quote,creating:true);}catch(ArgumentException){rejected=true;}
     Check(rejected,"Unknown quote contract property accepted");
 }
+// History pagination and scheduled backups run against a disposable database.
+var scratch=Directory.CreateTempSubdirectory("cotiza-checks-");
+try {
+    HistoryPage? Page(string query)=>HistoryPage.Parse(new QueryCollection(QueryHelpers.ParseQuery(query)));
+    var store=new QuoteStore(Path.Combine(scratch.FullName,"quotes.sqlite"));
+    var example=JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"contracts","example-quote.json")))!;
+    for(var i=0;i<5;i++)store.Save("owner-a",QuoteDomain.Validate(example.DeepClone(),creating:true));
+    store.Save("owner-b",QuoteDomain.Validate(example.DeepClone(),creating:true));
+    JsonNode Listed(HistoryPage page,string owner="owner-a")=>JsonSerializer.SerializeToNode(store.List(owner,page))!;
+    var full=Listed(Page("")!);
+    Check(full["quotes"]!.AsArray().Count==5 && full["nextCursor"]==null,"Full history page is wrong");
+    var seen=new List<string>();string? cursor=null;var pages=0;
+    do{var page=Listed(Page(cursor==null?"?limit=2":"?limit=2&before="+Uri.EscapeDataString(cursor))!);
+       Check(page["quotes"]!.AsArray().Count<=2,"Page ignores limit");seen.AddRange(page["quotes"]!.AsArray().Select(q=>q!["id"]!.GetValue<string>()));
+       cursor=page["nextCursor"]?.GetValue<string>();pages++;}while(cursor!=null && pages<10);
+    Check(pages==3 && seen.SequenceEqual(full["quotes"]!.AsArray().Select(q=>q!["id"]!.GetValue<string>())),"Pages skip or repeat proposals");
+    Check(Listed(Page("?limit=50")!,"owner-c")["quotes"]!.AsArray().Count==0,"Pagination leaks other owners");
+    Check(Page("")==new HistoryPage(20) && Page("?limit=50")!.Limit==50,"Valid pagination rejected");
+    foreach(var bad in new[]{"?limit=0","?limit=51","?limit=-1","?limit=1.5","?limit=abc","?limit=","?limit=1&limit=2","?before=x","?before=2026-11-13T13:51:14.815Z_' OR 1=1","?before=2026-11-13T13:51:14.815Z_BC85BBF4-BD14-45E8-8932-7AE2A7556630","?before=٢026-11-13T13:51:14.815Z_bc85bbf4-bd14-45e8-8932-7ae2a7556630"})
+        Check(Page(bad)==null,"Invalid pagination accepted: "+bad);
+
+    var options=new BackupOptions(Path.Combine(scratch.FullName,"backups"),TimeSpan.FromHours(24),2);
+    var start=new DateTime(2026,11,13,10,0,0,DateTimeKind.Utc);
+    Directory.CreateDirectory(options.Directory);
+    File.WriteAllText(Path.Combine(options.Directory,"notas.txt"),"x");File.WriteAllText(Path.Combine(options.Directory,"quotes-manual.sqlite"),"x");
+    var copies=Enumerable.Range(0,3).Select(i=>QuoteBackup.RunOnce(store.DatabasePath,options,start.AddHours(i))).ToList();
+    Check(!File.Exists(copies[0]) && !File.Exists(copies[0]+".metadata.json") && File.Exists(copies[1]) && File.Exists(copies[2]),"Backup rotation does not keep the newest copies");
+    Check(File.Exists(Path.Combine(options.Directory,"notas.txt")) && File.Exists(Path.Combine(options.Directory,"quotes-manual.sqlite")),"Backup rotation deletes files it did not create");
+    Check(!Directory.EnumerateFiles(options.Directory,".snapshot-*").Any(),"Backup leaves temporary files");
+    var metadata=JsonNode.Parse(File.ReadAllText(copies[2]+".metadata.json"))!;
+    using(var stream=File.OpenRead(copies[2]))
+        Check(metadata["schemaVersion"]!.GetValue<int>()==1 && metadata["sqliteIntegrity"]!.GetValue<string>()=="ok" && metadata["bytes"]!.GetValue<long>()==new FileInfo(copies[2]).Length && metadata["sha256"]!.GetValue<string>()==Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant(),"Backup metadata does not match the copy");
+    using(var copy=new SqliteConnection($"Data Source={copies[2]};Mode=ReadOnly;Pooling=False")){copy.Open();using var count=copy.CreateCommand();count.CommandText="SELECT count(*) FROM quotes";Check((long)count.ExecuteScalar()! == 6,"Backup misses committed quotes");}
+    var duplicate=false;try{QuoteBackup.RunOnce(store.DatabasePath,options,start.AddHours(2));}catch(IOException){duplicate=true;}
+    Check(duplicate,"Backup overwrites an existing copy");
+
+    IConfiguration Settings(params (string key,string value)[] values)=>new ConfigurationBuilder().AddInMemoryCollection(values.ToDictionary(v=>v.key,v=>(string?)v.value)).Build();
+    var defaults=BackupOptions.From(Settings(),store.DatabasePath);
+    Check(defaults.Enabled && defaults.Interval==TimeSpan.FromHours(24) && defaults.Keep==7 && defaults.Directory==Path.Combine(scratch.FullName,"backups"),"Backup defaults changed");
+    Check(!BackupOptions.From(Settings(("BACKUP_INTERVAL_HOURS","0")),store.DatabasePath).Enabled,"Backups cannot be disabled");
+    foreach(var (key,value) in new[]{("BACKUP_INTERVAL_HOURS","-1"),("BACKUP_INTERVAL_HOURS","169"),("BACKUP_INTERVAL_HOURS","1.5"),("BACKUP_KEEP","0"),("BACKUP_KEEP","366"),("BACKUP_KEEP","x")}) {
+        var rejected=false;try{BackupOptions.From(Settings((key,value)),store.DatabasePath);}catch(InvalidOperationException){rejected=true;}
+        Check(rejected,$"Invalid {key}={value} accepted");
+    }
+} finally { SqliteConnection.ClearAllPools(); scratch.Delete(true); }
 Console.WriteLine($"PASS: {assertions} .NET backend security assertions");
 
 sealed class TestEnvironment:IHostEnvironment {

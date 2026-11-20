@@ -23,6 +23,9 @@ async def public_load():
             assert response.status_code==200,(route,response.status_code)
             assert response.headers.get('x-content-type-options')=='nosniff'
             assert response.headers.get('x-frame-options')=='DENY'
+            csp=response.headers.get('content-security-policy') or ''
+            assert "frame-ancestors 'none'" in csp and "object-src 'none'" in csp and 'unsafe-eval' not in csp,csp
+            assert response.headers.get('strict-transport-security')=='max-age=63072000'
         assert (await client.get('/api/quotes')).status_code==401
         async def request(index):
             async with semaphore:

@@ -31,7 +31,11 @@ builder.Services.AddAuthorization(options=>{
     options.AddPolicy("read",p=>p.RequireAuthenticatedUser().RequireAssertion(c=>HasScope(c.User,"quotes:read")));
     options.AddPolicy("write",p=>p.RequireAuthenticatedUser().RequireAssertion(c=>HasScope(c.User,"quotes:write")));
 });
-builder.Services.AddSingleton(new QuoteStore(builder.Configuration["DATABASE_PATH"]??"./data/dotnet.sqlite"));
+var quoteStore=new QuoteStore(builder.Configuration["DATABASE_PATH"]??"./data/dotnet.sqlite");
+builder.Services.AddSingleton(quoteStore);
+// Invalid backup settings stop startup instead of silently running without copies.
+builder.Services.AddSingleton(BackupOptions.From(builder.Configuration,quoteStore.DatabasePath));
+builder.Services.AddHostedService<QuoteBackupService>();
 builder.Services.AddHttpClient<RucClient>().ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false});
 builder.Services.AddSingleton<CatalogStore>();
 builder.Services.AddRateLimiter(options=>{
@@ -58,7 +62,8 @@ string Owner(ClaimsPrincipal user) {
 }
 app.MapGet("/api/catalog",(CatalogStore store)=>Results.Json(store.Read()));
 app.MapGet("/health",()=>Results.Ok(new{status="ok"}));
-app.MapGet("/api/quotes",(ClaimsPrincipal user,QuoteStore store)=>Results.Ok(new{quotes=store.List(Owner(user))})).RequireAuthorization("read").RequireRateLimiting("quote-read");
+app.MapGet("/api/quotes",(HttpRequest request,ClaimsPrincipal user,QuoteStore store)=>
+    HistoryPage.Parse(request.Query) is {} page?Results.Ok(store.List(Owner(user),page)):Results.BadRequest(new{error="Parámetros de paginación inválidos."})).RequireAuthorization("read").RequireRateLimiting("quote-read");
 app.MapGet("/api/clients/ruc/{ruc}",async(string ruc,HttpRequest request,RucClient client)=>{
     if(!client.Authorized(request.Headers["X-Service-Key"]))return Results.Json(new{error="Servicio no autorizado."},statusCode:401);
     try{return Results.Json(await client.Lookup(ruc,request.HttpContext.RequestAborted));}

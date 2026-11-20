@@ -9,11 +9,13 @@ const require=createRequire(resolve(root,'web/package.json'));
 const {chromium}=require('playwright');
 const origin=process.env.E2E_ORIGIN||'http://127.0.0.1:3190';
 const artifacts=resolve(root,'tests/artifacts/browser');mkdirSync(artifacts,{recursive:true});
-const checks=[],errors=[];
+const checks=[],errors=[],cspViolations=[];
 const browser=await chromium.launch({headless:true,...(process.env.E2E_BROWSER_CHANNEL?{channel:process.env.E2E_BROWSER_CHANNEL}:{})});
 const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 page.on('pageerror',e=>errors.push(e.message));
+// CSP blocks surface only as console errors, never as page exceptions.
+page.on('console',m=>{if(m.type()==='error'&&/Content Security Policy|Refused to/i.test(m.text()))cspViolations.push(m.text());});
 function checked(name,condition=true){assert.ok(condition,name);checks.push(name);}
 async function amount(value){await page.locator('.grand-total b').filter({hasText:value}).waitFor();}
 try{
@@ -72,9 +74,10 @@ try{
  await page.getByRole('button',{name:'Consultar de nuevo',exact:true}).click();await page.getByText('Proveedor no disponible',{exact:true}).waitFor();
  checked('Explicit RUC retry reports provider failure',lookups===1);
  checked('No uncaught browser errors',errors.length===0);
- writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'passed',engine:'Chromium',channel:process.env.E2E_BROWSER_CHANNEL||'bundled',checks,uncaughtErrors:errors},null,2));
+ checked('No Content-Security-Policy violations',cspViolations.length===0);
+ writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'passed',engine:'Chromium',channel:process.env.E2E_BROWSER_CHANNEL||'bundled',checks,uncaughtErrors:errors,cspViolations},null,2));
  console.log(JSON.stringify({browser:'passed',checks:checks.length}));
 }catch(error){
  await page.screenshot({path:resolve(artifacts,'failure.png'),fullPage:true}).catch(()=>{});
- writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'failed',checks,error:String(error),uncaughtErrors:errors},null,2));throw error;
+ writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'failed',checks,error:String(error),uncaughtErrors:errors,cspViolations},null,2));throw error;
 }finally{await context.close();await browser.close();}

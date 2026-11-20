@@ -17,6 +17,20 @@ Junto al respaldo se crea `<archivo>.metadata.json`, con fecha UTC, tamaño, SHA
 
 SHA-256 detecta cambios respecto al metadato conservado, pero no es una firma ni demuestra autenticidad si un tercero puede reemplazar ambos archivos. No cambies el respaldo mientras se verifica o restaura. Conserva el archivo SQLite y su metadato juntos.
 
+## Respaldo automático del API .NET
+
+El API .NET, que guarda las cotizaciones en la configuración de Compose y Railway, crea una copia consistente de su base cada 24 horas. La primera se hace un minuto después de arrancar. Cada copia pasa `PRAGMA integrity_check` y se publica con el mismo `<archivo>.metadata.json` que `backup_sqlite.py`, así que `verify` y `restore` funcionan sobre ella sin cambios. Se conservan las 7 copias más recientes con nombre `quotes-AAAAMMDDTHHMMSSZ.sqlite`; la rotación no toca otros archivos del directorio.
+
+| Variable | Por defecto | Valores |
+|---|---|---|
+| `BACKUP_INTERVAL_HOURS` | `24` | `0` desactiva; de `1` a `168` |
+| `BACKUP_KEEP` | `7` | de `1` a `365` |
+| `BACKUP_DIR` | `backups/` junto a `DATABASE_PATH` | ruta privada del servicio |
+
+Un valor inválido detiene el arranque. Los fallos de una copia se registran sin datos de la base y el siguiente intento se hace en el intervalo normal.
+
+Estas copias viven en el mismo volumen que la base: protegen frente a corrupción, errores de operación o una versión defectuosa, pero no frente a la pérdida del volumen. Para eso copia periódicamente el directorio a un almacenamiento externo, o usa los respaldos de volumen del proveedor si los ofrece. Los backends alternativos Next y Python no programan copias; usa `backup_sqlite.py` con ellos.
+
 ## Restauración sin sobrescritura
 
 ```powershell

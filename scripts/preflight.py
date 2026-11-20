@@ -98,6 +98,11 @@ def evaluate(config: dict[str, str]) -> dict:
     check('ruc_provider', config.get('RUC_PROVIDER') == 'decolecta', 'RUC_PROVIDER debe ser decolecta para verificar RUC reales; demo y disabled bloquean esta validación de producción.')
     token = config.get('RUC_API_TOKEN', '')
     check('ruc_token', _set(token) and not token.lower().startswith('bearer ') and not any(char.isspace() for char in token), 'RUC_API_TOKEN debe estar presente sin el prefijo Bearer ni espacios.')
+    daily = config.get('RUC_DAILY_LIMIT', '').strip()
+    check('ruc_daily_limit', not daily or (daily.isascii() and daily.isdigit() and 1 <= int(daily) <= 100000), 'RUC_DAILY_LIMIT debe estar vacío (500 por defecto) o ser un entero entre 1 y 100000.')
+    for key, low, high, default in (('BACKUP_INTERVAL_HOURS', 0, 168, '24'), ('BACKUP_KEEP', 1, 365, '7')):
+        value = config.get(key, '').strip()
+        check(key.lower(), not value or (value.isascii() and value.isdigit() and low <= int(value) <= high), f'{key} debe estar vacío ({default} por defecto) o ser un entero entre {low} y {high}.')
     backend = config.get('API_BACKEND', '')
     check('api_backend', backend in ('next', 'dotnet', 'python'), 'API_BACKEND debe seleccionarse explícitamente.')
     if backend in ('dotnet', 'python'):

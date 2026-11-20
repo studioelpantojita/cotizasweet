@@ -7,6 +7,7 @@ import {randomBytes} from 'node:crypto';
 import {quoteSchema,createQuoteSchema,totals,paymentConditions,money,initialQuote} from '../lib/quote';
 import {isValidRuc} from '../lib/identity';
 import {ownerKey,putState,readState,saveQuote,listQuotes,deleteState,closeDatabase} from '../server/store';
+import {parseHistoryPage,historyQuery} from '../server/history-page';
 const cases=JSON.parse(readFileSync(new URL('../../contracts/pricing-cases.json',import.meta.url),'utf8'));
 const temp=mkdtempSync(join(tmpdir(),'ea-store-'));
 process.env.DATABASE_PATH=join(temp,'test.sqlite');process.env.SESSION_SECRET=randomBytes(32).toString('hex');
@@ -68,8 +69,25 @@ test('creation requires an address on location and rejects invalid numerical val
 test('private owner and immutable quote versions',()=>{
   const owner=ownerKey('https://id.example','alice'),other=ownerKey('https://id.example','bob');
   const quote=quoteSchema.parse(cases[0].quote),a=saveQuote(owner,quote),b=saveQuote(owner,quote);
-  assert.notEqual(a.id,b.id);assert.equal(listQuotes(owner).length,2);assert.deepEqual(listQuotes(other),[]);
+  assert.notEqual(a.id,b.id);assert.equal(listQuotes(owner).quotes.length,2);assert.deepEqual(listQuotes(other),{quotes:[],nextCursor:null});
   assert.notEqual(owner,ownerKey('https://other.example','alice'));
+});
+test('history pages follow the cursor without gaps, repeats or other owners',()=>{
+  const owner=ownerKey('https://id.example','paged'),quote=quoteSchema.parse(cases[0].quote);
+  for(let i=0;i<5;i++)saveQuote(owner,quote);saveQuote(ownerKey('https://id.example','intruder'),quote);
+  const all=listQuotes(owner,{limit:50});assert.equal(all.quotes.length,5);assert.equal(all.nextCursor,null);
+  const seen:string[]=[];let cursor:string|null=null,pages=0;
+  do{const page=parseHistoryPage(new URLSearchParams(cursor?{limit:'2',before:cursor}:{limit:'2'}))!;
+   const result=listQuotes(owner,page);assert.ok(result.quotes.length<=2);seen.push(...result.quotes.map(q=>q.id));cursor=result.nextCursor;pages++;}while(cursor&&pages<10);
+  assert.equal(pages,3);assert.deepEqual(seen,all.quotes.map(q=>q.id));
+});
+test('history pagination accepts only bounded limits and well-formed cursors',()=>{
+  const cursor='2026-11-13T13:51:14.815Z_bc85bbf4-bd14-45e8-8932-7ae2a7556630';
+  assert.deepEqual(parseHistoryPage(new URLSearchParams()),{limit:20});
+  assert.deepEqual(parseHistoryPage(new URLSearchParams({limit:'50',before:cursor})),{limit:50,before:{createdAt:'2026-11-13T13:51:14.815Z',id:'bc85bbf4-bd14-45e8-8932-7ae2a7556630'}});
+  for(const query of ['limit=0','limit=51','limit=-1','limit=1.5','limit=abc','limit=','limit=1&limit=2','before=x',"before=2026-11-13T13:51:14.815Z_' OR 1=1",'before='+cursor.toUpperCase(),'before='+cursor+'&before='+cursor])
+   assert.equal(parseHistoryPage(new URLSearchParams(query)),null,query);
+  assert.equal(historyQuery({limit:5,before:{createdAt:'2026-11-13T13:51:14.815Z',id:'bc85bbf4-bd14-45e8-8932-7ae2a7556630'}}).toString(),'limit=5&before='+encodeURIComponent(cursor));
 });
 test('encrypted, one-use transactions and session revocation',()=>{
   const id=putState('login',{value:'private'},60);assert.deepEqual(readState(id,'login',true),{value:'private'});assert.equal(readState(id,'login',true),null);

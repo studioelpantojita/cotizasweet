@@ -150,14 +150,37 @@ def catalog():
 @app.get('/health')
 def health():return {'status':'ok'}
 
+HISTORY_PAGE_DEFAULT, HISTORY_PAGE_MAX = 20, 50
+HISTORY_CURSOR = re.compile(r'([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z)_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})')
+
+def history_page(query):
+    """Same rules as web/server/history-page.ts and the .NET API; None when invalid."""
+    limits, cursors = query.getlist('limit'), query.getlist('before')
+    if len(limits) > 1 or len(cursors) > 1: return None
+    limit = HISTORY_PAGE_DEFAULT
+    if limits:
+        if not re.fullmatch(r'[0-9]{1,3}', limits[0]): return None
+        limit = int(limits[0])
+        if not 1 <= limit <= HISTORY_PAGE_MAX: return None
+    if not cursors: return limit, None
+    match = HISTORY_CURSOR.fullmatch(cursors[0])
+    return (limit, match.groups()) if match else None
+
 @app.get('/api/quotes')
-def get_quotes(user=Depends(identity)):
+def get_quotes(request:Request,user=Depends(identity)):
     owner, scopes = user
     if 'quotes:read' not in scopes: raise HTTPException(403,'Permiso quotes:read requerido.')
+    page = history_page(request.query_params)
+    if page is None: raise HTTPException(400,'Parámetros de paginación inválidos.')
     rate_limit(owner,'read')
+    limit, before = page
+    # One extra row tells whether another page exists without a second query.
+    sql = 'SELECT * FROM quotes WHERE owner=?' + (' AND (created_at<? OR (created_at=? AND id<?))' if before else '') + ' ORDER BY created_at DESC,id DESC LIMIT ?'
+    args = (owner, before[0], before[0], before[1], limit + 1) if before else (owner, limit + 1)
     with connection() as db:
-        rows = db.execute('SELECT * FROM quotes WHERE owner=? ORDER BY created_at DESC,id DESC LIMIT 200',(owner,)).fetchall()
-    return {'quotes':[record(row) for row in rows]}
+        rows = db.execute(sql, args).fetchall()
+    quotes = [record(row) for row in rows[:limit]]
+    return {'quotes': quotes, 'nextCursor': f"{quotes[-1]['createdAt']}_{quotes[-1]['id']}" if len(rows) > limit else None}
 
 @app.post('/api/quotes',status_code=201)
 async def post_quote(request:Request,user=Depends(identity)):
