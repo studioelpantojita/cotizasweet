@@ -5,14 +5,16 @@ import {createQuoteSchema,type Quote} from '@/lib/quote';
 import {verifyIdentity,RucError} from '@/server/ruc';
 import {readQuoteBody} from '@/server/quote-input';
 import {takeRateLimit} from '@/server/rate-limit';
+import {parseHistoryPage,historyQuery,type HistoryPage} from '@/server/history-page';
 export const runtime='nodejs';
 const json=(body:unknown,status=200,headers:Record<string,string>={})=>Response.json(body,{status,headers:{'Cache-Control':'no-store',...headers}});
 function ownerRateLimit(owner:string,operation:'read'|'write'){
   const limit=takeRateLimit(`quotes:${operation}:${owner}`,120,60);
   return limit.allowed?null:json({error:'Se alcanzó el límite de solicitudes. Intenta más tarde.'},429,{'Retry-After':String(limit.retryAfter)});
 }
-async function forward(session:Session,quote?:Quote){
-  const res=await fetch(apiUrl(),{method:quote?'POST':'GET',headers:{Authorization:`Bearer ${session.accessToken}`,...(quote?{'Content-Type':'application/json'}:{})},body:quote?JSON.stringify(quote):undefined,cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});
+async function forward(session:Session,quote?:Quote,page?:HistoryPage){
+  const url=apiUrl();if(page)url.search=historyQuery(page).toString();
+  const res=await fetch(url,{method:quote?'POST':'GET',headers:{Authorization:`Bearer ${session.accessToken}`,...(quote?{'Content-Type':'application/json'}:{})},body:quote?JSON.stringify(quote):undefined,cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});
   if(!res.ok){
     if(res.status===429){
       const supplied=res.headers.get('retry-after')||'';
@@ -23,15 +25,17 @@ async function forward(session:Session,quote?:Quote){
   }
   return json(await res.json(),res.status);
 }
-export async function GET(){
+export async function GET(request:Request){
   try{
     const session=await getSession();if(!session)return json({error:'Inicia sesión para consultar tus presupuestos.'},401);
     if(!session.scopes.includes('quotes:read'))return json({error:'Permiso quotes:read requerido.'},403);
+    const page=parseHistoryPage(new URL(request.url).searchParams);
+    if(!page)return json({error:'Parámetros de paginación inválidos.'},400);
     if(backend()==='next'){
       const limited=ownerRateLimit(session.owner,'read');if(limited)return limited;
-      return json({quotes:listQuotes(session.owner)});
+      return json(listQuotes(session.owner,page));
     }
-    return await forward(session);
+    return await forward(session,undefined,page);
   }catch{return json({error:'No pudimos cargar el historial.'},503);}
 }
 export async function POST(request:Request){

@@ -23,6 +23,24 @@ _lock=asyncio.Lock()
 _requests=[]
 _inflight={}
 MAX_INFLIGHT=4
+# Paid provider calls per calendar day in Peru (UTC-5, no DST). Cache hits and
+# requests joined to an in-flight lookup do not consume this budget.
+_daily={'day':None,'count':0}
+PERU=dt.timezone(dt.timedelta(hours=-5))
+DEFAULT_DAILY_LIMIT=500
+
+def daily_limit():
+    value=os.getenv('RUC_DAILY_LIMIT','').strip()
+    return int(value) if value else DEFAULT_DAILY_LIMIT
+
+def _take_daily_budget():
+    """Called under _lock before starting an upstream lookup."""
+    now=dt.datetime.now(PERU)
+    if _daily['day']!=now.date(): _daily.update(day=now.date(),count=0)
+    if _daily['count']>=daily_limit():
+        midnight=dt.datetime.combine(now.date()+dt.timedelta(days=1),dt.time(),PERU)
+        raise LookupError(429,'Se alcanzó el límite diario de consultas RUC. Vuelve a intentarlo mañana o completa la cotización con DNI.',max(1,int((midnight-now).total_seconds())))
+    _daily['count']+=1
 
 def validate_configuration():
     """Reject an unsafe deployment before accepting requests; never log values."""
@@ -32,6 +50,9 @@ def validate_configuration():
     provider=os.getenv('RUC_PROVIDER','disabled')
     if provider not in ('disabled','demo','decolecta'):
         raise RuntimeError('RUC_PROVIDER debe ser disabled, demo o decolecta.')
+    limit=os.getenv('RUC_DAILY_LIMIT','').strip()
+    if limit and not (limit.isascii() and limit.isdigit() and 1 <= int(limit) <= 100000):
+        raise RuntimeError('RUC_DAILY_LIMIT debe ser un entero entre 1 y 100000.')
     if os.getenv('APP_ENV')!='development':
         if provider=='demo':
             raise RuntimeError('El proveedor de demostración solo está permitido en desarrollo.')
@@ -109,6 +130,7 @@ async def lookup_ruc(ruc):
                 raise LookupError(429,'Se alcanzó el límite de consultas. Espera un minuto.',60)
             if len(_inflight)>=MAX_INFLIGHT:
                 raise LookupError(429,'Hay consultas en curso. Intenta de nuevo en unos segundos.',1)
+            _take_daily_budget()
             _requests.append(now)
             task=asyncio.create_task(_resolve_and_cache(key,ruc,provider))
             task.add_done_callback(_observe_result)

@@ -22,6 +22,8 @@ def isolated(monkeypatch):
     monkeypatch.setattr(service,'_cache',{})
     monkeypatch.setattr(service,'_inflight',{})
     monkeypatch.setattr(service,'_requests',[])
+    monkeypatch.setattr(service,'_daily',{'day':None,'count':0})
+    monkeypatch.delenv('RUC_DAILY_LIMIT',raising=False)
     monkeypatch.setattr(service,'_lock',asyncio.Lock())
 
 def ruc(number):
@@ -141,6 +143,44 @@ def test_provider_budget_is_shared_and_returns_retry_after():
         assert response.status_code==429
         assert response.headers['retry-after']=='60'
         assert response.headers['cache-control']=='no-store'
+
+def test_daily_budget_counts_only_paid_lookups_and_blocks_until_tomorrow(monkeypatch):
+    monkeypatch.setenv('RUC_DAILY_LIMIT','2')
+    calls=[]
+    async def fetch(value,provider):
+        calls.append(value)
+        return {'ruc':value,'legalName':'Prueba diaria','status':'ACTIVO','condition':'HABIDO','source':'Prueba','checkedAt':'2026-11-13T00:00:00+00:00','demo':True}
+    monkeypatch.setattr(service,'_fetch_ruc',fetch)
+    async def scenario():
+        await service.lookup_ruc(ruc(1))
+        await service.lookup_ruc(ruc(1))  # cache hit: no provider call, no budget
+        await service.lookup_ruc(ruc(2))
+        with pytest.raises(service.LookupError) as error: await service.lookup_ruc(ruc(3))
+        return error.value
+    error=asyncio.run(scenario())
+    assert calls==[ruc(1),ruc(2)] and service._daily['count']==2
+    assert error.status==429 and 'diario' in str(error)
+    assert 1 <= error.retry_after <= 86400
+
+def test_daily_budget_resets_on_a_new_peru_day(monkeypatch):
+    monkeypatch.setenv('RUC_DAILY_LIMIT','1')
+    service._daily.update(day=service.dt.date(2000,1,1),count=1)
+    service._take_daily_budget()
+    assert service._daily['day']==service.dt.datetime.now(service.PERU).date() and service._daily['count']==1
+
+def test_daily_budget_returns_429_with_retry_after_over_http(monkeypatch):
+    monkeypatch.setenv('RUC_DAILY_LIMIT','1')
+    service._daily.update(day=service.dt.datetime.now(service.PERU).date(),count=1)
+    with TestClient(service.app) as client:
+        response=client.get('/api/clients/ruc/20999999990',headers={'X-Service-Key':'x'*48})
+    assert response.status_code==429 and 'diario' in response.json()['error']
+    assert response.headers['retry-after'].isdigit() and response.headers['cache-control']=='no-store'
+
+@pytest.mark.parametrize('value',['0','-1','abc','100001','1.5','１０'])
+def test_invalid_daily_limit_is_rejected_at_startup(monkeypatch,value):
+    monkeypatch.setenv('RUC_DAILY_LIMIT',value)
+    with pytest.raises(RuntimeError,match='RUC_DAILY_LIMIT'):
+        service.validate_configuration()
 
 @pytest.mark.parametrize('status,body',[(200,b'not json'),(200,b'[]'),(200,b'x'*16385),(500,b'credential=private-example'),(302,b'')])
 def test_upstream_errors_are_bounded_and_sanitized(monkeypatch,status,body):

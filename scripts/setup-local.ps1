@@ -1,5 +1,6 @@
+﻿# -InstallBrowsers descarga además el Chromium de Playwright (~150 MB) para las pruebas en navegador.
 param([string]$NodePath='node',[string]$PythonPath='python',[string]$DotnetPath='dotnet',
-      [int]$WebPort=3340,[int]$ApiPort=8340,[int]$RucPort=8341,[int]$IdentityPort=9340)
+      [int]$WebPort=3340,[int]$ApiPort=8340,[int]$RucPort=8341,[int]$IdentityPort=9340,[switch]$InstallBrowsers)
 $ErrorActionPreference='Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 function Resolve-Executable([string]$name) { (Get-Command $name -ErrorAction Stop).Source }
@@ -18,7 +19,13 @@ if($LASTEXITCODE -ne 0){throw 'Falló la instalación Python.'}
 $npm=Join-Path (Split-Path $nodeExe) 'node_modules/npm/bin/npm-cli.js'
 if(!(Test-Path $npm)){throw 'No se encontró npm junto a Node. Instala una distribución completa de Node.js.'}
 Push-Location (Join-Path $projectRoot 'web')
-try { & $nodeExe $npm ci; if($LASTEXITCODE -ne 0){throw 'Falló npm ci.'} } finally { Pop-Location }
+try {
+    & $nodeExe $npm ci; if($LASTEXITCODE -ne 0){throw 'Falló npm ci.'}
+    if($InstallBrowsers){
+        & $nodeExe 'node_modules/playwright/cli.js' install chromium
+        if($LASTEXITCODE -ne 0){throw 'Falló la instalación de Chromium para Playwright.'}
+    }
+} finally { Pop-Location }
 & $dotnetExe restore (Join-Path $projectRoot 'EA-Cotiza.slnx') --locked-mode
 if($LASTEXITCODE -ne 0){throw 'Falló la restauración .NET.'}
 $settingsPath=Join-Path $projectRoot 'local.settings.json'

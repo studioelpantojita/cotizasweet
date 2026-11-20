@@ -233,8 +233,13 @@ def component_storage():
                 latencies=[x[1] for x in writes]
                 require(len({x[0]['id'] for x in writes})==64, 'Duplicate quote IDs')
                 for owner in ('alice','bob'):
-                    rows=client.get('/api/quotes',headers={'X-Test-Owner':owner}).json()['quotes']
-                    require(len(rows)==32, f'User isolation/count failure {owner}')
+                    # History is paginated: follow the cursor in pages of 10 after the concurrent writes.
+                    rows,cursor,pages=[],None,0
+                    while True:
+                        page=client.get('/api/quotes',params={'limit':'10',**({'before':cursor} if cursor else {})},headers={'X-Test-Owner':owner}).json()
+                        rows+=page['quotes'];cursor=page['nextCursor'];pages+=1
+                        if not cursor or pages>10:break
+                    require(len(rows)==32 and len({x['id'] for x in rows})==32 and pages==4, f'User isolation/count failure {owner}')
                     require(all(int(x['quote']['event'].rsplit(' ',1)[1])%2==(0 if owner=='alice' else 1) for x in rows), 'Cross-owner disclosure')
                 injection="alice' OR 1=1 --"
                 require(client.get('/api/quotes',headers={'X-Test-Owner':injection}).json()['quotes']==[], 'SQL injection/owner isolation')

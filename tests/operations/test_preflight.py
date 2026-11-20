@@ -58,6 +58,9 @@ class PreflightTests(unittest.TestCase):
             'API_BACKEND': ['invalid', ''],
             'API_BASE_URL': ['http://public.production-check.io', 'http://localhost:8000', 'http://api-dotnet:8000/path'],
             'TRUSTED_CLIENT_IP_HEADER': ['authorization'],
+            'RUC_DAILY_LIMIT': ['0', '-5', 'abc', '100001', '1.5'],
+            'BACKUP_INTERVAL_HOURS': ['-1', '169', 'x', '1.5'],
+            'BACKUP_KEEP': ['0', '366', 'x'],
             'NODE_ENV': ['development'],
             'APP_ENV': ['development'],
             'ASPNETCORE_ENVIRONMENT': ['Development'],
@@ -69,6 +72,21 @@ class PreflightTests(unittest.TestCase):
                     config[key] = value
                     self.assertEqual(preflight.evaluate(config)['status'], 'failed')
         self.assertEqual(preflight.evaluate({})['status'], 'failed')
+
+    def test_backup_settings_are_optional_and_bounded(self):
+        for key, values in (('BACKUP_INTERVAL_HOURS', ('', '0', '24', '168')), ('BACKUP_KEEP', ('', '1', '7', '365'))):
+            for value in values:
+                with self.subTest(key=key, value=value):
+                    config = synthetic_configuration()
+                    config[key] = value
+                    self.assertEqual(preflight.evaluate(config)['status'], 'passed')
+
+    def test_ruc_daily_limit_is_optional_and_bounded(self):
+        for value in ('', '1', '500', '100000'):
+            with self.subTest(value=value):
+                config = synthetic_configuration()
+                config['RUC_DAILY_LIMIT'] = value
+                self.assertEqual(preflight.evaluate(config)['status'], 'passed')
 
     def test_secret_keys_must_be_independent(self):
         config = synthetic_configuration()

@@ -3,6 +3,7 @@ import {mkdirSync, chmodSync} from 'node:fs';
 import {resolve, dirname} from 'node:path';
 import {createHash, createCipheriv, createDecipheriv, randomBytes, randomUUID} from 'node:crypto';
 import {totals, type Quote, type SavedQuote} from '@/lib/quote';
+import {HISTORY_PAGE_DEFAULT, historyCursor, type HistoryPage} from './history-page';
 
 let connection: DatabaseSync | undefined;
 export function db() {
@@ -52,8 +53,13 @@ export function readState<T>(id:string,kind:string,consume=false):T|null {
   try{return unseal<T>(String(row.payload));}catch{return null;}
 }
 export function deleteState(id:string) { db().prepare('DELETE FROM secure_state WHERE id=?').run(digest(id)); }
-export function listQuotes(owner:string):SavedQuote[] {
-  return db().prepare('SELECT * FROM quotes WHERE owner=? ORDER BY created_at DESC, id DESC LIMIT 200').all(owner).map(r=>({id:String(r.id),quote:JSON.parse(String(r.payload)),totalCents:Number(r.total_cents),createdAt:String(r.created_at)}));
+export function listQuotes(owner:string,page:HistoryPage={limit:HISTORY_PAGE_DEFAULT}):{quotes:SavedQuote[];nextCursor:string|null} {
+  // One extra row tells whether another page exists without a second query.
+  const sql='SELECT * FROM quotes WHERE owner=?'+(page.before?' AND (created_at<? OR (created_at=? AND id<?))':'')+' ORDER BY created_at DESC, id DESC LIMIT ?';
+  const args=page.before?[owner,page.before.createdAt,page.before.createdAt,page.before.id,page.limit+1]:[owner,page.limit+1];
+  const rows=db().prepare(sql).all(...args).map(r=>({id:String(r.id),quote:JSON.parse(String(r.payload)),totalCents:Number(r.total_cents),createdAt:String(r.created_at)}));
+  const quotes=rows.slice(0,page.limit);
+  return {quotes,nextCursor:rows.length>page.limit?historyCursor(quotes[quotes.length-1]):null};
 }
 export function saveQuote(owner:string,quote:Quote):SavedQuote {
   const record={id:randomUUID(),quote,totalCents:totals(quote).total,createdAt:new Date().toISOString()};

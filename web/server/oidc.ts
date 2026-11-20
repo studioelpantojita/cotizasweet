@@ -13,4 +13,9 @@ export function oidcConfig() {
   })().catch(e=>{promise=undefined;throw e;});
   return promise;
 }
-export type LoginState={verifier:string;state:string;nonce:string};
+export type LoginState={verifier:string;state:string;nonce:string;scope?:string};
+// RFC 6749 §5.1: a token response may omit `scope` when the grant equals the request.
+// An explicit `scope`, even an empty one, always wins over the requested value.
+export function grantedScopes(responseScope:string|undefined,requestedScope:string|undefined):string[]{
+  return (responseScope??requestedScope??'').split(' ').filter(Boolean);
+}

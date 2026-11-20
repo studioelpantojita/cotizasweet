@@ -2,7 +2,7 @@ import * as oidc from 'openid-client';
 import {cookies} from 'next/headers';
 import {NextResponse} from 'next/server';
 import {appOrigin} from '@/server/config';
-import {oidcConfig,type LoginState} from '@/server/oidc';
+import {oidcConfig,grantedScopes,type LoginState} from '@/server/oidc';
 import {readState,putState,ownerKey,deleteState} from '@/server/store';
 import {cookieName,cookieOptions} from '@/server/session';
 export const runtime='nodejs';
@@ -19,7 +19,7 @@ export async function GET(request:Request) {
     const ttl=Math.min(3600,Number(tokens.expires_in||300));
     if(!Number.isFinite(ttl)||ttl<1)throw new Error('Token expirado.');
     const old=jar.get(cookieName())?.value;if(old)deleteState(old);
-    const session=putState('session',{owner:ownerKey(claims.iss,claims.sub),displayName:String(claims.name||claims.email||'Mi cuenta'),accessToken:tokens.access_token,scopes:(tokens.scope||'').split(' ')},ttl);
+    const session=putState('session',{owner:ownerKey(claims.iss,claims.sub),displayName:String(claims.name||claims.email||'Mi cuenta'),accessToken:tokens.access_token,scopes:grantedScopes(tokens.scope,login.scope)},ttl);
     const response=NextResponse.redirect(new URL('/cotizar',appOrigin()));
     response.cookies.set(cookieName(),session,cookieOptions(ttl));
     response.cookies.set(cookieName('login'),'',cookieOptions(0));

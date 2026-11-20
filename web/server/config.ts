@@ -20,6 +20,13 @@ export function serviceBaseUrl(value:string) {
   if(url.protocol!=='https:'&&!(url.protocol==='http:'&&internal.includes(url.hostname)))throw new Error('El servicio remoto requiere HTTPS.');
   return url;
 }
+// Browsers label every request with Sec-Fetch-Site (it cannot be set by page scripts).
+// GET requests do not reliably carry Origin, so this blocks other sites from spending
+// paid lookups through visitors' browsers. Non-browser clients are bounded by quotas.
+export function crossSiteBrowserRequest(request: Request) {
+  const site = request.headers.get('sec-fetch-site');
+  return site !== null && site !== 'same-origin' && site !== 'none';
+}
 export function sameOrigin(request: Request) {
   return request.headers.get('origin') === appOrigin() && request.headers.get('sec-fetch-site') !== 'cross-site';
 }

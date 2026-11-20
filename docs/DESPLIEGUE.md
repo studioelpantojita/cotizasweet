@@ -91,6 +91,6 @@ La recuperación de estado cifrado de sesión requiere el mismo `SESSION_SECRET`
 
 ## Límites conocidos que debe revisar el operador
 
-El historial devuelve las últimas 200 cotizaciones y puede generar respuestas grandes. Una fila histórica corrupta puede impedir cargarlo; paginación y recuperación por registro continúan pendientes. Los límites por instancia y los topes globales requieren dimensionamiento. No se incluyen pagos, facturación electrónica, automatización de respaldos ni una migración de los datos anteriores.
+El historial se pagina con `limit` (20 por defecto, máximo 50) y un cursor `before`; una fila histórica que no cumple el contrato actual se marca individualmente sin impedir cargar las demás. Los límites por instancia y los topes globales requieren dimensionamiento. El API .NET programa copias verificadas en su propio volumen; la copia externa sigue a cargo del operador. No se incluyen pagos, facturación electrónica ni una migración de los datos anteriores.
 
 Esta documentación prepara un despliegue revisable. La certificación externa, disponibilidad, conformidad comercial y aceptación operativa del entorno necesitan sus comprobaciones propias; no se deducen del éxito de los tests locales.

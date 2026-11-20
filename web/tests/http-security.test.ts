@@ -7,6 +7,9 @@ import {readQuoteBody,MAX_QUOTE_BYTES} from '../server/quote-input';
 import {closeDatabase,db} from '../server/store';
 import {takeRateLimit,trustedClientAddress,rateLimit} from '../server/rate-limit';
 import {GET as getQuotes,POST as postQuote} from '../app/api/quotes/route';
+import {GET as getRuc} from '../app/api/clients/ruc/[ruc]/route';
+import {crossSiteBrowserRequest} from '../server/config';
+import {grantedScopes} from '../server/oidc';
 
 const temp=mkdtempSync(join(tmpdir(),'sweet-http-'));
 process.env.DATABASE_PATH=join(temp,'security.sqlite');
@@ -91,7 +94,7 @@ test('quote proxy preserves upstream 429 and only accepts bounded numeric Retry-
  try{
   for(const [retry,expected] of [['19','19'],['1','1'],['3600','3600'],['0','60'],['86400','60'],['2.5','60'],['tomorrow','60'],['','60']]){
    const fetchMock=t.mock.method(globalThis,'fetch',async()=>new Response('{"error":"private upstream details"}',{status:429,headers:retry?{'Retry-After':retry}:{}}));
-   const response=await getQuotes();
+   const response=await getQuotes(new Request('http://localhost/api/quotes'));
    assert.equal(response.status,429);assert.equal(response.headers.get('retry-after'),expected);
    assert.equal(response.headers.get('cache-control'),'no-store');
    const body=await response.json();assert.match(body.error,/límite/);assert.doesNotMatch(body.error,/private/);
@@ -112,16 +115,37 @@ test('Next quote routes persist separate per-owner read and write limits',async 
  process.env.API_BACKEND='next';process.env.APP_ORIGIN='http://localhost:3000';
  const invalid=()=>request('{','application/json',{'Origin':'http://localhost:3000'});
  try{
-  for(let i=0;i<120;i++)assert.equal((await getQuotes()).status,200);
+  for(let i=0;i<120;i++)assert.equal((await getQuotes(new Request('http://localhost/api/quotes'))).status,200);
   closeDatabase();
-  const blocked=await getQuotes();assert.equal(blocked.status,429);
+  const blocked=await getQuotes(new Request('http://localhost/api/quotes'));assert.equal(blocked.status,429);
   assert.equal(blocked.headers.get('cache-control'),'no-store');assert.ok(Number(blocked.headers.get('retry-after'))>=1);
   for(let i=0;i<120;i++)assert.equal((await postQuote(invalid())).status,400);
   assert.equal((await postQuote(invalid())).status,429);
-  owner='synthetic-bob';assert.equal((await getQuotes()).status,200);assert.equal((await postQuote(invalid())).status,400);
+  owner='synthetic-bob';assert.equal((await getQuotes(new Request('http://localhost/api/quotes'))).status,200);assert.equal((await postQuote(invalid())).status,400);
  }finally{
   if(oldBackend===undefined)delete process.env.API_BACKEND;else process.env.API_BACKEND=oldBackend;
   if(oldOrigin===undefined)delete process.env.APP_ORIGIN;else process.env.APP_ORIGIN=oldOrigin;
   t.mock.restoreAll();
  }
+});
+
+test('RUC lookups triggered by other sites are rejected before spending quota',async()=>{
+ const lookup=(headers:Record<string,string>={})=>getRuc(new Request('http://localhost/api/clients/ruc/00000000000',{headers}),{params:Promise.resolve({ruc:'00000000000'})});
+ for(const site of ['cross-site','same-site']){
+  const response=await lookup({'sec-fetch-site':site});
+  assert.equal(response.status,403);
+  assert.equal(response.headers.get('cache-control'),'no-store');
+ }
+ // Same-origin browser calls, typed URLs and non-browser clients reach validation (invalid RUC → 400).
+ for(const headers of [{'sec-fetch-site':'same-origin'},{'sec-fetch-site':'none'},{}] as Record<string,string>[])assert.equal((await lookup(headers)).status,400);
+ assert.equal(crossSiteBrowserRequest(new Request('http://localhost',{headers:{'sec-fetch-site':'cross-site'}})),true);
+});
+
+test('session scopes fall back to the requested scopes only when the provider omits them',()=>{
+ const requested='openid profile email quotes:read quotes:write';
+ assert.deepEqual(grantedScopes(undefined,requested),['openid','profile','email','quotes:read','quotes:write']);
+ assert.deepEqual(grantedScopes('openid quotes:read',requested),['openid','quotes:read']);
+ assert.deepEqual(grantedScopes('',requested),[]);
+ assert.deepEqual(grantedScopes(undefined,undefined),[]);
+ assert.deepEqual(grantedScopes('openid  quotes:read ',undefined),['openid','quotes:read']);
 });
