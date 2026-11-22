@@ -50,7 +50,7 @@ const quoteFields=z.object({
  taxPercent:z.union([z.literal(0),z.literal(18)]).default(0),materialNotes:z.string().trim().max(1600).default(''),
  deliveryCents:z.number().int().min(0).max(100000000),advancePercent:z.number({error:'Ingresa un porcentaje entero entre 0 y 100.'}).int('El anticipo debe ser un porcentaje entero.').min(0,'El anticipo no puede ser menor a 0%.').max(100,'El anticipo no puede superar el 100%.'),notes:z.string().trim().max(1600),
 }).strict();
-export const draftSchema=quoteFields.extend({business:short,client:z.string().trim().max(300),items:quoteFields.shape.items.min(0)});
+export const draftSchema=quoteFields.extend({business:short,client:z.string().trim().max(300),items:z.array(itemSchema).max(30)});
 export const quoteSchema=quoteFields.superRefine((q,ctx)=>{
  const fail=(path:string,message:string)=>ctx.addIssue({code:'custom',path:[path],message});
  if(q.formVersion===2){
@@ -58,7 +58,7 @@ export const quoteSchema=quoteFields.superRefine((q,ctx)=>{
   if(q.clientType==='empresa'&&kind!=='ruc')fail('documentType','Las empresas requieren RUC.');
   if(kind==='ruc'?!isValidRuc(q.clientDocument):!/^\d{8}$/.test(q.clientDocument))fail('clientDocument',kind==='ruc'?'Ingresa un RUC válido, incluido su dígito verificador.':'Ingresa el DNI del cliente con 8 dígitos.');
   if(!q.contact.trim())fail('contact','Completa el contacto de tu negocio.');
-  if(!q.event.trim())fail('event','Escribe el nombre del proyecto.');
+  if(!q.event.trim())fail('event','Describe el proyecto.');
  }
  if(q.clientEmail&&!z.string().email().safeParse(q.clientEmail).success)fail('clientEmail','Escribe un correo válido para el cliente.');
  for(const m of q.materials){const d=ingredientDefinition(m.name);for(const [key,values] of Object.entries(m.configuration.selections)){const g=d?.groups.find(g=>g.id===key);if(!g||values.some(v=>!g.options.includes(v))||new Set(values).size!==values.length)fail('materials','Revisa las opciones de insumos seleccionadas.');}

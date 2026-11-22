@@ -1,5 +1,7 @@
 # Operaciones y comprobaciones previas
 
+La versión de interfaz 2.3.0 conserva las opciones de respaldo, cuotas y restauración introducidas en 2.2.1. Las instrucciones de esta guía siguen siendo aplicables. La validación y los límites actuales se documentan en [UPGRADE-2.3.md](UPGRADE-2.3.md).
+
 Los programas `scripts/backup_sqlite.py` y `scripts/preflight.py` usan únicamente la biblioteca estándar de Python 3.12 o posterior. No seleccionan bases ni leen archivos privados de forma implícita. Ejecútalos desde la raíz del proyecto con el Python de su entorno virtual. Esta guía corresponde a E&A Cotiza **2.2.1** y distingue el respaldo automático .NET de las tareas manuales del operador.
 
 ## Respaldo consistente de SQLite

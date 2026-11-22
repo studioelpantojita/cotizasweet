@@ -1,6 +1,6 @@
 const {spawnSync}=require('node:child_process');
 const {writeFileSync,mkdirSync}=require('node:fs');
-const suites=['domain.test.ts','catalog.test.ts','presentations.test.ts','custom-service.test.ts','http-security.test.ts','service-urls.test.ts','history.test.ts'];
+const suites=['domain.test.ts','catalog.test.ts','presentations.test.ts','custom-service.test.ts','http-security.test.ts','service-urls.test.ts','history.test.ts','project-details.test.ts'];
 const results=[];
 for(const suite of suites){
  const started=performance.now();

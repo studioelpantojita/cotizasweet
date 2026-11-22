@@ -188,7 +188,7 @@ async def lifespan(app):
     for task in pending: task.cancel()
     if pending: await asyncio.gather(*pending,return_exceptions=True)
 
-app=FastAPI(title='E&A Cotiza · Resolución RUC',version='2.2.1',docs_url=None,redoc_url=None,lifespan=lifespan)
+app=FastAPI(title='E&A Cotiza · Resolución RUC',version='2.3.0',docs_url=None,redoc_url=None,lifespan=lifespan)
 @app.middleware('http')
 async def no_store(request,call_next):
     response=await call_next(request)

@@ -21,6 +21,7 @@ const page=await context.newPage();
 page.setDefaultTimeout(30000);
 page.on('pageerror',error=>errors.push(error.message));
 function checked(name,condition=true){assert.ok(condition,name);checks.push(name);}
+async function step(index){await page.getByRole('navigation',{name:'Pasos de la cotización'}).getByRole('button').nth(index).click();await page.locator('#quote-step-'+index).waitFor({state:'visible'});}
 try{
  const response=await page.goto(process.env.E2E_ORIGIN);
  const policy=response.headers()['content-security-policy'];
@@ -40,6 +41,7 @@ try{
  await page.locator('#client-document').waitFor();
  await page.waitForFunction(name=>document.querySelector('#client-name')?.value===name,quote.client);
  checked('Draft hydrates in production',await page.locator('#client-name').inputValue()===quote.client);
+ await step(3);
  await page.getByRole('button',{name:'Ver PDF',exact:true}).click();
  await page.getByRole('img',{name:'Página 1 del PDF de la cotización'}).waitFor({state:'visible'});
  await page.getByText(/Página 1 de \d/).waitFor();

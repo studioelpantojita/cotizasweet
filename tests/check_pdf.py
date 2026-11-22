@@ -6,6 +6,7 @@ import pdfplumber
 
 root=Path(__file__).resolve().parent/'artifacts'
 results=[]
+inputs=json.loads((root/'inputs.json').read_text(encoding='utf-8'))
 for path in (root/'pdf').glob('*.pdf'):
     with pdfplumber.open(path) as pdf:
         bad=[]
@@ -19,6 +20,10 @@ for path in (root/'pdf').glob('*.pdf'):
                 if c['x0'] < 40 or c['x1'] > 559 or c['top'] < 5 or c['bottom'] > 833:
                     bad.append({'page':i+1,'text':c['text'],'box':[c['x0'],c['top'],c['x1'],c['bottom']]})
         text='\n'.join(p.extract_text() or '' for p in pdf.pages)
+        # Continuation-page headings and footers can sit between the wrapped detail lines.
+        # Remove those fixed bands to compare the full content across page boundaries.
+        body_text='\n'.join(p.crop((0,75,p.width,792)).extract_text() or '' for p in pdf.pages)
+        compact_body=re.sub(r'\s+','',body_text)
         assert 'Dulce Atelier' in text and 'IDENTIDAD REFERENCIAL' in text, path.name
         if path.stem=='long_description':
             # Se conservan las 149 líneas X de la descripción, además de la X del teléfono referencial.
@@ -32,14 +37,16 @@ for path in (root/'pdf').glob('*.pdf'):
             assert 'No queda saldo pendiente' in left
         if path.stem=='long_headers':
             compact=re.sub(r'\s+','',text)
-            assert ('PROYECTO'*17)[:120] in compact
+            assert ('PROYECTO'*17)[:120] not in compact
+            assert sum(line.strip()=='Detalle' for line in text.splitlines())==70
             assert text.count('W')==120
             assert sum(line.strip()=='Nota' for line in text.splitlines())==310
             assert re.sub(r'\s+','',('ESPECIFICACIÓN PERSONALIZADA '*5)[:120]) in compact
         if path.stem=='test_project':
             assert len(pdf.pages)==1,'La cotización de prueba breve debe ocupar una página'
             compact=re.sub(r'\s+','',text)
-            assert 'PRUEBA·AniversariodeValentina-mesadulceyregalos' in compact
+            assert 'PRUEBA·AniversariodeValentina-mesadulceyregalos' not in compact
+            assert re.sub(r'\s+','',inputs['test_project']['projectBrief']) in compact
             assert all(amount in text for amount in ['339.84','101.95','237.89'])
             assert 'Coordinar el horario de recojo.' in text
         if path.stem.startswith('redesign_'):
@@ -47,11 +54,28 @@ for path in (root/'pdf').glob('*.pdf'):
             assert all(amount in text for amount in ['339.84','169.92'])
             assert '50%' in text and 'Condiciones'.upper() in text
             assert '30/10/2026' in text and '+51 900000000' in text
-            assert 'Valentina' in text and 'mini repostería' in text
+            assert 'Valentina' in text
+            assert re.sub(r'\s+','',inputs[path.stem]['projectBrief']) in re.sub(r'\s+','',text)
             if path.stem=='redesign_usd':
                 assert 'USD' in text and 'US$' in text and 'S/' not in text and 'PEN' not in text
             else:
                 assert 'PEN' in text and 'S/' in text and 'USD' not in text
+        if path.stem in inputs:
+            expected=inputs[path.stem]['projectBrief'].strip() or inputs[path.stem]['event'].strip()
+            compact=re.sub(r'\s+','',text)
+            assert 'DETALLEDELPROYECTO' in compact,(path.name,'Falta el título del detalle')
+            assert 'ObjetivodelProyecto:' in compact,(path.name,'Falta el objetivo del proyecto')
+            # Every character of the full detail must survive wrapping and page breaks.
+            expected_compact=re.sub(r'\s+','',expected)
+            assert expected_compact in compact_body,(path.name,'Detalle del Proyecto truncado')
+        if path.stem=='detail_maximum':
+            expected=inputs[path.stem]['projectBrief']
+            assert len(expected)==600
+            assert 'FIN-DETALLE' in text
+            assert 'TÍTULO ANTIGUO QUE DEBE SER REEMPLAZADO' not in text
+            assert compact_body.count(re.sub(r'\s+','',expected))==1
+        if path.stem=='legacy_project_title':
+            assert 'Proyecto histórico sin detalle adicional' in text
         if path.stem=='zero_total':
             assert 'no tiene importe a pagar' in text
         assert not bad,(path.name,bad[:3])

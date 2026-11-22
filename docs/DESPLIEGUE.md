@@ -1,4 +1,6 @@
-# Despliegue de E&A Cotiza 2.2.1
+# Despliegue de E&A Cotiza 2.3.0
+
+La actualización de interfaz 2.3.0 conserva la arquitectura y los ajustes operativos de esta guía. Su validación actual está en [UPGRADE-2.3.md](UPGRADE-2.3.md), y el recorrido local en [REVISION-MANUAL-2.3.md](REVISION-MANUAL-2.3.md). Las imágenes Docker 2.3.0 requieren reconstrucción y smoke con el motor disponible. La evidencia Docker 2.2.1 que se describe abajo pertenece a esa entrega anterior. El build final de producción y los servicios nativos de 2.3.0 se verificaron localmente. La publicación continúa pendiente de aprobación expresa.
 
 Guía revisada el 20 de noviembre de 2026 para la copia local 2.2.1. La publicación en GitHub y la continuación del despliegue quedan pendientes de la aprobación expresa del propietario. Los resultados de versiones anteriores se conservan en [UPGRADE-2.1.md](UPGRADE-2.1.md) y [VALIDACION-V2.md](VALIDACION-V2.md). [RAILWAY.md](RAILWAY.md) contiene la receta del alojamiento elegido y [REVISION-MANUAL-2.2.1.md](REVISION-MANUAL-2.2.1.md) permite revisar la entrega desde Visual Studio.
 

@@ -126,7 +126,7 @@ async def lifespan(app):
     initialize_catalog(DATABASE, os.environ.get('CATALOG_FILE'))
     yield
 
-app = FastAPI(title='CotizaSweet API',version='2.2.1',lifespan=lifespan,docs_url=None,redoc_url=None)
+app = FastAPI(title='CotizaSweet API',version='2.3.0',lifespan=lifespan,docs_url=None,redoc_url=None)
 
 @app.middleware('http')
 async def no_store(request, call_next):

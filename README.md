@@ -1,13 +1,15 @@
-# E&A Cotiza 2.2.1
+# E&A Cotiza 2.3.0
 
 ![E&A Cotiza](web/public/brand/eacotiza-horizontal-granate.svg)
 
-Plataforma de cotización de pastelería del proyecto CotizaSweet, con Next.js/TypeScript, ASP.NET Core .NET 10 y Python 3.12. Permite consultar el catálogo, preparar propuestas, generar PDF y conservar un historial por cuenta. Esta versión incorpora la marca E&A Cotiza y los cambios derivados del informe técnico del 13 de noviembre de 2026.
+Plataforma de cotización de pastelería del proyecto CotizaSweet, con Next.js/TypeScript, ASP.NET Core .NET 10 y Python 3.12. Permite consultar el catálogo, preparar propuestas, generar PDF y conservar un historial por cuenta. Esta versión reorganiza la experiencia de navegación y cotización según las observaciones visuales del 21 de noviembre de 2026, conservando la marca E&A Cotiza, los campos y los cálculos de la plataforma.
 
-La actualización 2.2.1 incorpora opciones de respaldo, recuperación del planificador y compatibilidad con el historial de la API 2.1. Su alcance y pruebas se documentan en [UPGRADE-2.2.1.md](docs/UPGRADE-2.2.1.md). Esta entrega se prepara y valida localmente. Su publicación en el repositorio personal [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet) queda pendiente de la aprobación expresa del propietario. Las comprobaciones de esta entrega deben vincularse a la copia o commit y a sus artefactos. Los resultados anteriores están documentados en [VALIDACION-V2.md](docs/VALIDACION-V2.md) y [UPGRADE-2.1.md](docs/UPGRADE-2.1.md), como antecedentes de sus respectivas versiones.
+La actualización 2.3.0 incorpora un cotizador en cuatro pasos, el campo único Detalle del Proyecto y su contenido completo en PDF, fichas emergentes para las fotografías de inicio, navegación simplificada y la corrección visual de la búsqueda. Su alcance y pruebas se documentan en [UPGRADE-2.3.md](docs/UPGRADE-2.3.md). La copia anterior 2.2.1 conserva su carpeta y sus datos; esta revisión tiene nuevas bases y no migra automáticamente las propuestas anteriores. Esta entrega se prepara y valida localmente. Su publicación en el repositorio personal [studioelpantojita/cotizasweet](https://github.com/studioelpantojita/cotizasweet) queda pendiente de la aprobación expresa del propietario. Las comprobaciones de esta entrega deben vincularse a la copia o commit y a sus artefactos. Los resultados anteriores están documentados en [VALIDACION-V2.md](docs/VALIDACION-V2.md) y [UPGRADE-2.1.md](docs/UPGRADE-2.1.md), como antecedentes de sus respectivas versiones.
 
 ## Capacidades de esta versión
 
+- Cotizador con cuatro pasos: Proyecto y cliente, Servicios e insumos, Entrega y condiciones y Revisar propuesta. Conserva todos los campos vigentes, con Detalle del Proyecto en reemplazo del antiguo campo Proyecto, y mantiene borrador, historial, validaciones, PDF y acciones de guardado y compartición.
+- Fotografías de inicio con fichas emergentes, navegación Catálogo / Cómo Funciona / Accede y dos accesos visibles al cotizador en la página principal. La búsqueda del catálogo muestra un único indicador de foco accesible.
 - Marca vectorial en cabeceras, pie, catálogo y PDF, tipografía local DM Sans y favicon específico de 16 × 16 px. La identidad referencial del negocio en la cotización sigue identificada como **Dulce Atelier** y datos de muestra.
 - Historial con páginas de 20 y cursor estable en los tres backends. Cada fila se valida por separado y los registros de versiones anteriores se identifican para que puedan revisarse conservando las propuestas compatibles.
 - Consulta RUC con guardia de origen del navegador, caché, agrupación de solicitudes concurrentes y cuota diaria persistente. El límite predeterminado de 500 reservas de consulta se cuenta por día de Perú y antes de contactar a Decolecta, incluidos los intentos que terminen con error.
@@ -22,12 +24,12 @@ Instala Node.js 24 o posterior, Python 3.12 o posterior y .NET SDK 10. Comprueba
 Desde la raíz de esta copia ejecuta lo siguiente.
 
 ```powershell
-.\scripts\setup-local.ps1 -NodePath node -PythonPath python -DotnetPath dotnet -WebPort 3360 -ApiPort 8360 -RucPort 8361 -IdentityPort 9360 -InstallBrowsers
+.\scripts\setup-local.ps1 -NodePath node -PythonPath python -DotnetPath dotnet -WebPort 3370 -ApiPort 8370 -RucPort 8371 -IdentityPort 9370 -InstallBrowsers
 ```
 
 El script crea el entorno `.venv`, instala dependencias, restaura la solución con los archivos de bloqueo y genera `local.settings.json`. `-InstallBrowsers` instala Chromium para las pruebas automatizadas. Las rutas y los puertos locales quedan en ese archivo privado.
 
-El comando anterior prepara los puertos de la revisión 2.2.1. Consulta [REVISION-MANUAL-2.2.1.md](docs/REVISION-MANUAL-2.2.1.md) para acceder a esta copia independiente y registrar observaciones.
+El comando anterior prepara los puertos de la revisión 2.3.0. Consulta [REVISION-MANUAL-2.3.md](docs/REVISION-MANUAL-2.3.md) para acceder a esta copia independiente y registrar observaciones.
 
 Abre **INICIAR-EN-VISUAL-STUDIO.slnx**, elige **EA.Cotiza.Local** como proyecto de inicio y pulsa F5. La solución incluye el lanzador y la API para que ambos proyectos se compilen. Ante un error de compilación, revisa la salida y recompila la solución completa antes de iniciar una nueva instancia.
 
@@ -37,20 +39,20 @@ También puedes ejecutar el lanzador desde PowerShell.
 dotnet run --project launcher/EA.Cotiza.Local.csproj
 ```
 
-| Componente local | Puerto predeterminado |
+| Componente local | Puerto de esta revisión |
 |---|---:|
-| Interfaz Next.js | 3340 |
-| API .NET | 8340 |
-| Servicio Python RUC | 8341 |
-| Identidad local de desarrollo | 9340 |
+| Interfaz Next.js | 3370 |
+| API .NET | 8370 |
+| Servicio Python RUC | 8371 |
+| Identidad local de desarrollo | 9370 |
 
 El lanzador indica la dirección efectiva de la aplicación y mantiene los servicios activos hasta detenerlo con Mayús+F5 o Ctrl+C. Los parámetros `-WebPort`, `-ApiPort`, `-RucPort` e `-IdentityPort` permiten asignar puertos diferentes al preparar otra copia. El script conserva los puertos previamente guardados si se vuelve a ejecutar con sus valores predeterminados y sin parámetros de puerto.
 
-El acceso local utiliza un emisor efímero de desarrollo y una cuenta sintética. Las sesiones caducan y al reiniciar puede ser necesario entrar de nuevo. Las cotizaciones guardadas permanecen en la base de esta copia. `data/`, `logs/`, `.venv` y la configuración privada se excluyen del control de versiones.
+El acceso local utiliza un emisor efímero de desarrollo y la cuenta sintética Desarrollo local, correo local@example.test. Pulsa Accede para entrar sin contraseña. Las sesiones caducan y al reiniciar puede ser necesario entrar de nuevo. Las cotizaciones guardadas permanecen en la base de esta copia. `data/`, `logs/`, `.venv` y la configuración privada se excluyen del control de versiones.
 
 ## Revisar una propuesta y configurar RUC
 
-Para comprobar el cotizador, elige Persona Natural con DNI y usa datos ficticios. Completa los campos obligatorios, añade servicios con precios explícitos, revisa moneda, recojo o locación, movilidad, IGV, anticipo y saldo y genera el PDF. PEN y USD conservan sus importes sin conversión automática.
+Para comprobar el cotizador, entra en Proyecto y cliente y elige Persona Natural con DNI usando datos ficticios. Completa Objetivo del Proyecto, Detalle del Proyecto y los datos del cliente. Continúa por Servicios e insumos para añadir servicios con precios explícitos y por Entrega y condiciones para revisar recojo o locación, movilidad, fechas, IGV, anticipo y notas. En Revisar propuesta puedes validar, guardar, previsualizar y descargar el PDF. El detalle admite hasta 600 unidades de texto según el límite del formulario y se incluye completo en el documento; el contrato interno mantiene un resumen compatible para las API existentes. PEN y USD conservan sus importes sin conversión automática.
 
 La consulta real de RUC necesita una credencial nueva y vigente de Decolecta. Completa `RUC_PROVIDER`, `RUC_API_TOKEN` y `RUC_DAILY_LIMIT` en `.env.ruc.local`, que el preparador crea desde el ejemplo. Introduce el token en privado y con su valor directo, sin prefijo Bearer. Una credencial que haya quedado expuesta debe revocarse y sustituirse en el proveedor.
 
@@ -75,6 +77,15 @@ Después de preparar el entorno, instala las herramientas de QA y ejecuta la bat
 ```
 
 El script usa las rutas de `local.settings.json` y admite `-PythonPath`, `-NodePath`, `-DotnetPath` y `-BrowserChannel` para elegir ejecutables o navegador. La integración ejecuta perfiles sintéticos `standard` y `google` sobre los tres backends.
+
+Con la revisión local iniciada, los recorridos específicos de inicio, catálogo y navegación por pasos se pueden repetir desde la raíz. Estos dos scripts usan datos ficticios y no guardan cotizaciones.
+
+```powershell
+$env:E2E_ORIGIN='http://127.0.0.1:3370'
+$env:E2E_BROWSER_CHANNEL='msedge'
+node tests/home-catalog.e2e.mjs
+node tests/wizard.e2e.mjs
+```
 
 Las comprobaciones web se ejecutan desde `web/`.
 
@@ -106,4 +117,4 @@ Railway es el destino preparado para el piloto. Esta entrega permanece local has
 
 [RAILWAY.md](docs/RAILWAY.md) describe los tres servicios y tres volúmenes, las variables y la secuencia de publicación. [DESPLIEGUE.md](docs/DESPLIEGUE.md) y [OPERACIONES.md](docs/OPERACIONES.md) reúnen los requisitos de operación y reversión. Antes de aplicar infraestructura, revisa el commit, sus comprobaciones y el plan concreto del entorno.
 
-La revisión local de esta entrega se documenta en [UPGRADE-2.2.1.md](docs/UPGRADE-2.2.1.md), con resultados ejecutados, alcance y requisitos externos pendientes. [AUDITORIA-2.2.md](docs/AUDITORIA-2.2.md) conserva la evidencia de la versión 2.2.0. La copia 2.2.1 preparada en este equipo utiliza el puerto 3360 y su ficha privada `.local/ACCESO_LOCAL_PRIVADO.html`.
+La revisión local de esta entrega se documenta en [UPGRADE-2.3.md](docs/UPGRADE-2.3.md), con resultados ejecutados, alcance y requisitos externos pendientes. [UPGRADE-2.2.1.md](docs/UPGRADE-2.2.1.md) y [AUDITORIA-2.2.md](docs/AUDITORIA-2.2.md) conservan la evidencia de sus versiones respectivas. La copia 2.3.0 preparada en este equipo utiliza el puerto 3370 y su ficha privada `.local/ACCESO_LOCAL_PRIVADO.html`.

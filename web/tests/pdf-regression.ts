@@ -20,7 +20,9 @@ const variants:Record<string,any>={
  no_advance:{...base,advancePercent:0}, full_advance:{...base,advancePercent:100},
  zero_total:{...base,items:base.items.map((i:any)=>({...i,priceCents:0}))},
  long_headers:{...base,event:'PROYECTO'.repeat(17).slice(0,120),projectBrief:'Detalle\n'.repeat(70),notes:'Nota\n'.repeat(310),materials:[{...base.materials[0],name:'ESPECIFICACIÓN PERSONALIZADA '.repeat(5).slice(0,120),selected:true,detail:'Detalle conservado para verificar el encabezado largo.'}],items:[{...base.items[0],name:'W'.repeat(120),unit:'UNIDAD'.repeat(10)}]},
- test_project:{...base,event:'PRUEBA · Aniversario de Valentina - mesa dulce y regalos',projectType:'cumpleanos',projectBrief:'Mini repostería y cajas de regalo para 30 invitados. Colores marfil y borgoña, etiquetas con el nombre de la celebración.',advancePercent:30,notes:'Confirmar sabores y presentación antes de producir.\nCoordinar el horario de recojo.\nLos cambios de alcance se cotizan por separado.'}
+ test_project:{...base,event:'PRUEBA · Aniversario de Valentina - mesa dulce y regalos',projectType:'cumpleanos',projectBrief:'Mini repostería y cajas de regalo para 30 invitados. Colores marfil y borgoña, etiquetas con el nombre de la celebración.',advancePercent:30,notes:'Confirmar sabores y presentación antes de producir.\nCoordinar el horario de recojo.\nLos cambios de alcance se cotizan por separado.'},
+ detail_maximum:{...base,event:'TÍTULO ANTIGUO QUE DEBE SER REEMPLAZADO',projectBrief:('DETALLE COMPLETO de la celebración.\n'.repeat(22)).slice(0,589)+'FIN-DETALLE'},
+ legacy_project_title:{...base,event:'Proyecto histórico sin detalle adicional',projectBrief:''}
 };
 const redesigned={...base,contact:'+51 900000000',client:'Cliente de prueba · Valentina',clientEmail:'valentina@example.test',event:'Celebración de Valentina · colección de mini repostería',projectType:'cumpleanos',issued:'2026-10-12',validUntil:'2026-11-02',eventDate:'2026-10-30',projectBrief:'Selección para 30 invitados, presentación en tonos marfil y borgoña.',advancePercent:50,notes:'Confirmar sabores y diseño antes de iniciar la producción.\nCoordinar el horario de recojo. Los cambios de alcance se cotizan por separado.'};
 variants.redesign_pen={...redesigned,currency:'PEN'};variants.redesign_usd={...redesigned,currency:'USD'};
@@ -32,7 +34,7 @@ const cases=JSON.parse(readFileSync(root+'/contracts/pricing-cases.json','utf8')
 results.pricing=cases.map((c:any)=>({match:JSON.stringify(totals(quoteSchema.parse(c.quote)))===JSON.stringify(c.expected),actual:totals(quoteSchema.parse(c.quote)),expected:c.expected}));
 const fonts={regular:readFileSync(root+'/web/public/fonts/quote-regular.ttf').toString('base64'),bold:readFileSync(root+'/web/public/fonts/quote-bold.ttf').toString('base64')};
 mkdirSync('../tests/artifacts/pdf',{recursive:true});
-for(const key of ['base','long_description','max_normal','unicode_material','no_advance','full_advance','zero_total','long_headers','test_project','redesign_pen','redesign_usd']){
+for(const key of ['base','long_description','max_normal','unicode_material','no_advance','full_advance','zero_total','long_headers','test_project','redesign_pen','redesign_usd','detail_maximum','legacy_project_title']){
  const doc=createQuotePdf(variants[key],'audit-'+key,fonts);writeFileSync('../tests/artifacts/pdf/'+key+'.pdf',Buffer.from(doc.output('arraybuffer')));results.pdf.push({key,pages:doc.getNumberOfPages()});
 }
 writeFileSync('../tests/artifacts/pdf-results.json',JSON.stringify(results,null,2));

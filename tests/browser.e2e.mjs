@@ -20,17 +20,20 @@ await context.addInitScript(()=>{
 const page=await context.newPage();page.setDefaultTimeout(20000);
 page.on('pageerror',e=>errors.push(e.message));
 function checked(name,condition=true){assert.ok(condition,name);checks.push(name);}
-async function amount(value){await page.locator('.grand-total b').filter({hasText:value}).waitFor();}
+async function amount(value){await page.locator('.wizard-total strong').filter({hasText:value}).waitFor();}
+async function step(index){await page.getByRole('navigation',{name:'Pasos de la cotización'}).getByRole('button').nth(index).click();await page.locator('#quote-step-'+index).waitFor({state:'visible'});}
 try{
  await page.goto(origin);await page.locator('h1').waitFor();checked('Home renders');
  await page.getByRole('link',{name:'Catálogo',exact:true}).first().click();await page.waitForURL('**/catalogo');
  await page.getByRole('searchbox',{name:'Buscar en esta categoría'}).fill('lúcuma');
  await page.locator('.sweet-results-heading').getByRole('status').filter({hasText:'1 presentación'}).waitFor();checked('Catalog search ignores accents');
  await page.goto(origin+'/cotizar?proyecto=cumpleanos');await page.locator('#client-document').waitFor();
+ await step(3);
  await page.getByRole('button',{name:'Descargar cotización PDF',exact:true}).click();
  await page.locator('#client-document[aria-invalid=true]').waitFor();checked('Incomplete form rejects PDF');
  await page.locator('#client-document').fill('12345678');await page.locator('#client-name').fill('Cliente sintético QA navegador');
- await page.locator('#business-phone').fill('900000000');await page.getByRole('textbox',{name:/^Proyecto \*/}).fill('QA navegador · servicio personalizado');
+ await page.locator('#business-phone').fill('900000000');await page.getByRole('textbox',{name:/^Detalle del Proyecto/}).fill('QA navegador · servicio personalizado con detalles que permanecen al guardar y al descargar.');
+ await step(1);
  await page.locator('#quote-currency').click();await page.getByRole('option',{name:'USD · Dólares',exact:true}).click();
  await page.getByRole('button',{name:'Explorar toda la cartera'}).click();
  await page.getByRole('button',{name:'Personalizar Delicia de fresas',exact:true}).click();
@@ -44,6 +47,7 @@ try{
  await dialog.getByRole('button',{name:'Añadir a la propuesta',exact:true}).click();await dialog.waitFor({state:'hidden'});
  await amount('354.00');checked('USD total is 354.00 for 2 × 150 plus IGV');
  checked('Pickup retains confirmed location',await page.locator('[data-field="address"] input').inputValue().then(x=>x.includes('LosPantojados')));
+ await step(3);
  await page.getByRole('button',{name:'Ver PDF',exact:true}).click();
  await page.getByRole('img',{name:'Página 1 del PDF de la cotización'}).waitFor({state:'visible'});
  await page.getByText('Página 1 de 1',{exact:true}).waitFor();
@@ -52,7 +56,7 @@ try{
  const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'Descargar cotización PDF',exact:true}).click();
  const download=await downloading;const pdf=resolve(artifacts,'cotizacion-qa.pdf');await download.saveAs(pdf);
  checked('Browser downloads a valid PDF',readFileSync(pdf).subarray(0,5).toString()==='%PDF-');
- await page.getByRole('link',{name:'Iniciar sesión',exact:true}).first().click();await page.waitForURL('**/cotizar');
+ await page.getByRole('link',{name:'Accede',exact:true}).first().click();await page.waitForURL('**/cotizar');
  await page.getByRole('link',{name:'Cerrar sesión',exact:true}).waitFor();checked('OIDC redirects back to signed-in UI');
  await amount('354.00');checked('Draft survives sign-in redirect');
  await page.getByRole('button',{name:'Guardar',exact:true}).click();await page.getByText(/Guardado ·/).waitFor();
@@ -65,6 +69,7 @@ try{
  await page.getByRole('button',{name:'Cargar más propuestas',exact:true}).waitFor({state:'hidden'});
  checked('History loads the next page without losing proposals',await page.locator('.history-row').count()===26);
  await page.locator('.history-row').filter({has:page.getByRole('heading',{name:'Cliente sintético QA navegador',exact:true})}).getByRole('button',{name:'Abrir',exact:true}).click();await amount('354.00');checked('Reopening history preserves totals');
+ await step(3);
  await page.reload();await amount('354.00');checked('Draft survives reload');
  await page.screenshot({path:resolve(artifacts,'desktop.png'),fullPage:true});
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,deviceScaleFactor:1});
@@ -92,7 +97,7 @@ try{
  Object.assign(ruc,{clientType:'empresa',documentType:'ruc',clientDocument:'20999999990',client:'RAZÓN SOCIAL HISTÓRICA QA'});
  await context.addInitScript(value=>sessionStorage.setItem('ea-pastry-draft',JSON.stringify(value)),ruc);
  let lookups=0;await page.route('**/api/clients/ruc/**',route=>{lookups++;return route.fulfill({status:503,json:{error:'Proveedor no disponible'}});});
- await page.reload();await page.locator('#client-name').filter({visible:true}).waitFor();
+ await page.reload();await step(0);await page.locator('#client-name').filter({visible:true}).waitFor();
  await page.getByText('Nombre conservado del presupuesto.',{exact:false}).waitFor();
  checked('Historical RUC name is preserved',await page.locator('#client-name').inputValue()==='RAZÓN SOCIAL HISTÓRICA QA');
  checked('Opening historical RUC does not issue a new lookup',lookups===0);

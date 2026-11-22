@@ -4,7 +4,7 @@ import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {randomBytes} from 'node:crypto';
-import {quoteSchema,createQuoteSchema,totals,paymentConditions,money,initialQuote} from '../lib/quote';
+import {quoteSchema,createQuoteSchema,draftSchema,totals,paymentConditions,money,initialQuote} from '../lib/quote';
 import {isValidRuc} from '../lib/identity';
 import {ownerKey,putState,readState,saveQuote,listQuotes,deleteState,closeDatabase} from '../server/store';
 const cases=JSON.parse(readFileSync(new URL('../../contracts/pricing-cases.json',import.meta.url),'utf8'));
@@ -18,6 +18,16 @@ test('new quotes reject historical version bypass and empty product names',()=>{
  const q=cases[0].quote;
  for(const patch of [{formVersion:1},{pricingVersion:1},{client:'   '},{items:[{...q.items[0],name:'\n\t '}]},{clientType:'empresa',documentType:'ruc',clientDocument:'00000000000'}])assert.equal(createQuoteSchema.safeParse({...q,...patch}).success,false);
  assert.equal(quoteSchema.safeParse(cases[2].quote).success,true);
+});
+
+test('incomplete drafts retain the project before services are chosen without weakening final validation',()=>{
+ const draft={...initialQuote(),projectBrief:'Celebración para 30 invitados',event:'Celebración para 30 invitados',client:'Cliente de prueba'};
+ assert.deepEqual(draftSchema.parse(draft),draft);
+ assert.equal(createQuoteSchema.safeParse(draft).success,false);
+ const item=cases[0].quote.items[0];
+ assert.equal(draftSchema.safeParse({...draft,items:Array.from({length:30},(_,i)=>({...item,id:'draft-'+i}))}).success,true);
+ assert.equal(draftSchema.safeParse({...draft,items:Array.from({length:31},(_,i)=>({...item,id:'draft-'+i}))}).success,false);
+ assert.equal(draftSchema.safeParse({...draft,items:[{...item,quantity:-1}]}).success,false);
 });
 test('RUC checksum and independent document type for natural persons',()=>{
  for(const ruc of ['20131312955','20999999990','10999999994'])assert.equal(isValidRuc(ruc),true);

@@ -1,4 +1,5 @@
 import {clientDocumentType} from './identity';
+import {projectDetails} from './project-details';
 import {jsPDF} from 'jspdf';
 import {drawBrandSignature} from './brand-pdf';
 import {ingredientDetails} from './ingredients';
@@ -58,9 +59,8 @@ export function createQuotePdf(input:Quote,id:string|undefined,fonts:PdfFonts){
  const a=column('NOMBRE / RAZÓN SOCIAL',clientFields),b=column('MODALIDAD DEL SERVICIO',[locationLabel(q),locationDetail(q)||(q.locationMode==='pickup'&&q.address?'':'Ubicación por coordinar'),`${q.locationMode==='pickup'?'Dirección de recojo':'Dirección del servicio'}: ${q.address||'Por coordinar'}`].filter(Boolean));
  for(let i=0;i<Math.max(a.length,b.length);i++){need(6);for(const [line,x] of [[a[i],left],[b[i],110]] as const)if(line)write(line.text,x,y,line.size,line.bold,line.bold?c.ink:c.body);y+=4.7;}y+=4;
  if(q.clientLookup){flow(q.clientLookup.demo?'DATOS DE DEMOSTRACIÓN: el RUC y el nombre no fueron consultados en SUNAT.':`Identificación: ${q.clientLookup.source}${q.clientLookup.dataDate?' · Padrón al '+q.clientLookup.dataDate:''} · ${q.clientLookup.status} / ${q.clientLookup.condition}`,7.5,3.8,c.muted);y+=4;}
- heading('Nombre del proyecto');shadedText(q.event.trim()||info.label,11);
- flow(`Objetivo: ${info.label}${q.eventDate?' · Fecha del evento: '+dateLabel(q.eventDate):''}`,8,4,c.muted);y+=3;
- if(q.projectBrief.trim()){flow(q.projectBrief,8.6,4.2);y+=3;}y+=2;
+ heading('Detalle del Proyecto');shadedText(projectDetails(q)||info.label,11);
+ flow(`Objetivo del Proyecto: ${info.label}${q.eventDate?' · Fecha del evento: '+dateLabel(q.eventDate):''}`,8,4,c.muted);y+=5;
  section='DETALLE DE SERVICIOS';
  function tableHeader(continued=false){need(24);write(continued?'DETALLE DE SERVICIOS · CONTINUACIÓN':'DETALLE DE SERVICIOS',left,y,8.3,true,c.ink);y+=4;doc.setFillColor(c.ink);doc.rect(left,y,width,9,'F');write('CÓDIGO',19,y+5.8,7.5,true,c.white);write('DETALLE DEL SERVICIO',42,y+5.8,7.5,true,c.white);write('CANT.',130,y+5.8,7.5,true,c.white,'right');write('P. UNITARIO',160,y+5.8,7.5,true,c.white,'right');write('IMPORTE',191,y+5.8,7.5,true,c.white,'right');y+=9;}
  const first=q.items[0];
@@ -101,13 +101,13 @@ export function createQuotePdf(input:Quote,id:string|undefined,fonts:PdfFonts){
  flow(`Válida hasta ${dateLabel(q.validUntil)}. Moneda: ${q.currency==='USD'?'dólares estadounidenses (USD)':'soles (PEN)'}.${q.pricingVersion===2?' IGV sobre servicios más movilidad.':''}`);
  if(q.notes){y+=3;flow(q.notes);}y+=5;
  const details=ingredientDetails(q),terms=materialConditions(q);
- if(details.some(line=>line.trim())||terms.length){section='FICHA DE INSUMOS';page();write('Ficha de insumos',left,y,20,true,c.ink);y+=9;flow(`${single(q.client)} · ${single(q.event)||info.label}`,8.3);y+=6;
+ if(details.some(line=>line.trim())||terms.length){section='FICHA DE INSUMOS';page();write('Ficha de insumos',left,y,20,true,c.ink);y+=9;flow(`${single(q.client)} · ${info.label}`,8.3);y+=6;
   const titles=new Set([...q.materials.map(m=>m.name.toUpperCase()),'NOTAS CONSERVADAS DEL PEDIDO','SOLICITUD REGISTRADA ANTERIORMENTE','REVISIÓN REGISTRADA ANTERIORMENTE']);
   for(const line of details){if(!line.trim())continue;if(titles.has(line)){y+=3;heading(single(line));}else{flow(line,8.7,4.3);y+=3;}}
   if(terms.length){y+=4;heading('Condiciones de insumos');terms.forEach((term,i)=>{flow(`${i+1}. ${term}`);y+=3;});}
  }
  const pages=doc.getNumberOfPages();for(let n=1;n<=pages;n++){doc.setPage(n);rule(283);drawBrandSignature(doc,left,284.8,42);write('Propuesta comercial. No es un comprobante de pago.',80,289,6.8,false,c.muted);write(`${n} / ${pages}`,right,289,7.4,false,c.muted,'right');}
- doc.setProperties({title:`${reference} · ${single(q.event)||info.label}`,subject:`Cotización de pastelería · ${single(q.client)}`,author:'E&A Cotiza · Identidad referencial',creator:'E&A Cotiza · Plantilla 4'});return doc;
+ doc.setProperties({title:`${reference} · ${single(projectDetails(q))||info.label}`,subject:`Cotización de pastelería · ${single(q.client)}`,author:'E&A Cotiza · Identidad referencial',creator:'E&A Cotiza · Plantilla 4'});return doc;
 }
 export async function quotePdfBlob(q:Quote,id?:string){const [regular,bold]=await Promise.all([loadFont('/fonts/quote-regular.ttf'),loadFont('/fonts/quote-bold.ttf')]);return createQuotePdf(q,id,{regular,bold}).output('blob');}
 export async function downloadPdf(q:Quote,id?:string,share=false){

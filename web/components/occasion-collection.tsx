@@ -4,6 +4,7 @@ import {ArrowUpRight, Check} from 'lucide-react';
 import {collections, projectInfo, type ProjectType} from '@/lib/quote';
 import {presentationFor, projectsInCollection, quoteCtaLabel, quoteHref} from '@/lib/project-presentations';
 import {ShowcaseCard} from './showcase-card';
+import {ImagePresentation} from './image-presentation';
 
 export function OccasionCollection({value, onChange}: {value:ProjectType; onChange:(value:ProjectType)=>void}) {
   const project = projectInfo(value);
@@ -18,7 +19,7 @@ export function OccasionCollection({value, onChange}: {value:ProjectType; onChan
     <fieldset className="occasion-types"><legend className="sweet-step">02 <span>Selecciona tu tipo de proyecto</span></legend><div>{options.map(p => <label key={p.id} className={p.id === value ? 'is-selected' : ''}><input type="radio" name="occasion-type" checked={p.id === value} value={p.id} onChange={() => onChange(p.id)}/><span>{p.label}</span>{p.id === value && <Check size={14} aria-hidden="true"/>}</label>)}</div></fieldset>
     <p className="sr-only" role="status">Mostrando {project.label}: imagen de referencia, servicios y detalles del proyecto.</p>
     <article className={'occasion-story '+(presentation.contain ? 'has-coffret' : '')} aria-labelledby="occasion-story-heading">
-      <figure className="occasion-story-image"><Image key={presentation.image} src={'/images/'+presentation.image} alt={presentation.imageAlt} fill sizes="(max-width: 800px) 90vw, 48vw"/><figcaption>INSPIRACIÓN PARA {project.label.toLocaleUpperCase('es')}</figcaption></figure>
+      <figure className="occasion-story-image"><ImagePresentation key={presentation.image} className="occasion-story-photo" title={presentation.headline} image={'/images/'+presentation.image} description={presentation.description} category={collection.title+' / '+project.label} format={presentation.details} imageAlt={presentation.imageAlt} project={value}><Image src={'/images/'+presentation.image} alt={presentation.imageAlt} fill sizes="(max-width: 800px) 90vw, 48vw"/></ImagePresentation><figcaption>INSPIRACIÓN PARA {project.label.toLocaleUpperCase('es')}</figcaption></figure>
       <div className="occasion-story-copy"><p className="sweet-kicker">{collection.title} / {project.label}</p><h3 id="occasion-story-heading">{presentation.headline}</h3><p>{presentation.description}</p><div className="occasion-story-detail"><span>A DEFINIR CONTIGO</span><p>{presentation.details}</p></div><span className="occasion-reference">Imagen referencial · selección y acabados sujetos a confirmación.</span></div>
     </article>
     <div className="occasion-offer"><div className="occasion-offer-intro"><p className="sweet-kicker">PARA COMPONER TU PROYECTO</p><h3>Elige el contenido.<br/><em>Hazlo tuyo.</em></h3><p>Estas opciones están disponibles en el cotizador. Tú defines cuáles incorporar y en qué cantidad.</p></div><div className="occasion-service-grid">{presentation.services.map(service => <article key={service.id}><span>{service.category === 'pack' ? 'PACK / '+service.unit : 'ADICIONAL / '+service.unit}</span><h4>{service.name}</h4><p>{service.description}</p></article>)}</div></div>
