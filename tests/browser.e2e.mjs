@@ -27,7 +27,9 @@ try{
  await page.getByRole('link',{name:'Catálogo',exact:true}).first().click();await page.waitForURL('**/catalogo');
  await page.getByRole('searchbox',{name:'Buscar en esta categoría'}).fill('lúcuma');
  await page.locator('.sweet-results-heading').getByRole('status').filter({hasText:'1 presentación'}).waitFor();checked('Catalog search ignores accents');
- await page.goto(origin+'/cotizar?proyecto=cumpleanos');await page.waitForURL('**/auth/login');checked('Quotation requires a signed-in user');
+ const publicQuotation=await page.goto(origin+'/cotizar?proyecto=cumpleanos');
+ checked('A visitor can open the quotation page without signing in',publicQuotation.status()===200&&new URL(page.url()).pathname==='/cotizar');
+ checked('Public quotation access does not grant private customer history',(await context.request.get(origin+'/api/quotes')).status()===401);
  await page.goto(origin+'/auth/oidc');await page.waitForURL('**/cotizar');checked('OIDC signs in through the configured explicit provider route');
  await page.goto(origin+'/cotizar?proyecto=cumpleanos');await page.locator('#client-document').waitFor();
  await step(3);
