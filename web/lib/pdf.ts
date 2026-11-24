@@ -4,6 +4,7 @@ import {jsPDF} from 'jspdf';
 import {drawBrandSignature} from './brand-pdf';
 import {ingredientDetails} from './ingredients';
 import {referenceBusiness} from './reference-business';
+import {hasPendingPrice} from './product-pricing';
 import {catalog,addons,money,quoteSchema,totals,projectInfo,materialConditions,locationLabel,locationDetail,paymentConditions,type Quote,type QuoteItem} from './quote';
 
 export type PdfFonts={regular:string;bold:string};
@@ -51,7 +52,7 @@ export function createQuotePdf(input:Quote,id:string|undefined,fonts:PdfFonts){
  const meta=[['FECHA DE EMISIÓN',dateLabel(q.issued)],['VÁLIDA HASTA',dateLabel(q.validUntil)],['PAQUETE',single(packageName)],['MONEDA',q.currency==='USD'?'USD · Dólares':'PEN · Soles']];
  const values=meta.map(([,value])=>wrap(value,width/4-8,9.3,true)),height=10+Math.max(...values.map(v=>v.length))*4.3;
  doc.setFillColor(c.pale);doc.roundedRect(left,y,width,height,1.5,1.5,'F');
- meta.forEach(([label],i)=>{const x=left+i*width/4;write(label,x+4,y+5,7,true,c.muted);values[i].forEach((v,j)=>write(v,x+4,y+11+j*4.3,9.3,true,c.ink));});y+=height+10;
+ meta.forEach(([label],i)=>{const x=left+i*width/4;write(label,x+4,y+5,7,true,c.muted);values[i].forEach((v,j)=>write(v,x+4,y+11+j*4.3,9.3,true,c.ink));});y+=height+8;
  type Line={text:string;bold?:boolean;size?:number};
  function column(label:string,fields:string[]):Line[]{return [{text:label,bold:true,size:7.5},...fields.flatMap(v=>wrap(single(v),83,8.7).map(text=>({text,size:8.7})))];}
  const clientFields=[q.client,`${clientDocumentType(q).toUpperCase()}: ${q.clientDocument||'No registrado'}`,`Contacto del negocio: ${q.contact||'No registrado'}`];
@@ -60,7 +61,9 @@ export function createQuotePdf(input:Quote,id:string|undefined,fonts:PdfFonts){
  for(let i=0;i<Math.max(a.length,b.length);i++){need(6);for(const [line,x] of [[a[i],left],[b[i],110]] as const)if(line)write(line.text,x,y,line.size,line.bold,line.bold?c.ink:c.body);y+=4.7;}y+=4;
  if(q.clientLookup){flow(q.clientLookup.demo?'DATOS DE DEMOSTRACIÓN: el RUC y el nombre no fueron consultados en SUNAT.':`Identificación: ${q.clientLookup.source}${q.clientLookup.dataDate?' · Padrón al '+q.clientLookup.dataDate:''} · ${q.clientLookup.status} / ${q.clientLookup.condition}`,7.5,3.8,c.muted);y+=4;}
  heading('Detalle del Proyecto');shadedText(projectDetails(q)||info.label,11);
- flow(`Objetivo del Proyecto: ${info.label}${q.eventDate?' · Fecha del evento: '+dateLabel(q.eventDate):''}`,8,4,c.muted);y+=5;
+ flow(`Objetivo del Proyecto: ${info.label}${q.eventDate?' · Fecha del evento: '+dateLabel(q.eventDate):''}`,8,4,c.muted);y+=3;
+ if(q.items.some(item=>item.portfolioId||item.catalogId)){flow('PRECIOS REFERENCIALES PARA PRUEBAS. El negocio debe confirmar tarifas, contenido y disponibilidad antes de aceptar el servicio.',8,4,c.ink);y+=2;}
+ if(hasPendingPrice(q)){flow('TOTAL PROVISIONAL: los servicios sin referencia quedan pendientes de evaluación. El importe 0 no significa que sean gratuitos.',8,4,c.ink);y+=4;}
  section='DETALLE DE SERVICIOS';
  function tableHeader(continued=false){need(24);write(continued?'DETALLE DE SERVICIOS · CONTINUACIÓN':'DETALLE DE SERVICIOS',left,y,8.3,true,c.ink);y+=4;doc.setFillColor(c.ink);doc.rect(left,y,width,9,'F');write('CÓDIGO',19,y+5.8,7.5,true,c.white);write('DETALLE DEL SERVICIO',42,y+5.8,7.5,true,c.white);write('CANT.',130,y+5.8,7.5,true,c.white,'right');write('P. UNITARIO',160,y+5.8,7.5,true,c.white,'right');write('IMPORTE',191,y+5.8,7.5,true,c.white,'right');y+=9;}
  const first=q.items[0];
@@ -87,13 +90,17 @@ export function createQuotePdf(input:Quote,id:string|undefined,fonts:PdfFonts){
  });
  section='RESUMEN Y CONDICIONES';y+=8;
  const payment=paymentConditions(q).flatMap(note=>wrap(note,82,8.3).concat(['']));
- const termsHeight=9+payment.length*4.1,summaryHeight=q.pricingVersion===2?69:57;need(Math.max(termsHeight,summaryHeight));const top=y;
+ if(q.promotion)payment.push(...wrap('PROMOCIÓN NAVIDEÑA: 20% en servicios por registro. Eventos del 30/11/2026 al 02/01/2027; descuento antes de movilidad e IGV.',82,8.3));
+ const rowGap=q.promotion?5.3:6;
+ const termsHeight=9+payment.length*4.1,summaryHeight=(q.pricingVersion===2?69:57)+(q.promotion?8:0);need(Math.max(termsHeight,summaryHeight));const top=y;
  write('CONDICIONES DE PAGO',left,top,8.3,true,c.ink);payment.forEach((line,i)=>write(line,left,top+7+i*4.1,8.3));
  write('RESUMEN ECONÓMICO',110,top,8.3,true,c.ink);
- const amounts:[string,number][]=[['Subtotal de servicios',t.subtotal],[q.pricingVersion===2?`Movilidad (${t.mobilityRate}%)`:'Entrega / traslado',t.mobility]];
+ const amounts:[string,number][]=[['Subtotal de servicios',t.subtotal]];
+ if(q.promotion)amounts.push(['Descuento navideño (20%)',-t.discount],['Subtotal con descuento',t.netServices]);
+ amounts.push([q.pricingVersion===2?`Movilidad (${t.mobilityRate}%)`:'Entrega / traslado',t.mobility]);
  if(q.pricingVersion===2)amounts.push(['Base imponible',t.base],['IGV (18%)',t.tax]);
- amounts.forEach(([label,value],i)=>{write(label,110,top+8+i*6,8.3);fit(money(value,q.currency),right,top+8+i*6,31,8.8);});
- const totalY=top+8+amounts.length*6;doc.setFillColor(c.ink);doc.roundedRect(106,totalY,88,16,2,2,'F');write('TOTAL',111,totalY+10,9,true,c.white);fit(money(t.total,q.currency),189,totalY+10,56,16,true,c.white);
+ amounts.forEach(([label,value],i)=>{write(label,110,top+8+i*rowGap,8.3);fit(money(value,q.currency),right,top+8+i*rowGap,31,8.8);});
+ const totalY=top+8+amounts.length*rowGap;doc.setFillColor(c.ink);doc.roundedRect(106,totalY,88,16,2,2,'F');write('TOTAL',111,totalY+10,9,true,c.white);fit(money(t.total,q.currency),189,totalY+10,56,16,true,c.white);
  write(`Anticipo (${q.advancePercent}%)`,110,totalY+24,8.3);fit(money(t.advance,q.currency),right,totalY+24,31,8.8);
  write(t.balance===0?'Saldo pendiente':q.locationMode==='pickup'?'Saldo al recoger':'Saldo al entregar',110,totalY+31,8.3);fit(money(t.balance,q.currency),right,totalY+31,31,8.8,true,c.ink);
  // Reserve the heading and its first paragraph, without forcing a near-empty continuation page.

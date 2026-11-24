@@ -28,7 +28,9 @@ const redesigned={...base,contact:'+51 900000000',client:'Cliente de prueba · V
 variants.redesign_pen={...redesigned,currency:'PEN'};variants.redesign_usd={...redesigned,currency:'USD'};
 const results:any={validation:{},pricing:[],pdf:[]};
 for(const [key,q] of Object.entries(variants)){const v=createQuoteSchema.safeParse(q);results.validation[key]={accepted:v.success,issues:v.success?[]:v.error.issues.map(i=>({path:i.path,message:i.message}))};}
-const rejected=new Set(['bad_currency','bad_phone','ruc_zeros','ruc_short','legacy_form_bypass','legacy_pricing_bypass','no_items','bad_email','blank_item','no_address','bad_date','wrong_district']);
+const historical=new Set(['max_normal','no_advance','full_advance','zero_total','long_headers','test_project']);
+for(const key of historical){const parsed=quoteSchema.safeParse(variants[key]);assert.ok(parsed.success,`Historical PDF fixture: ${key}`);}
+const rejected=new Set(['bad_currency','bad_phone','ruc_zeros','ruc_short','legacy_form_bypass','legacy_pricing_bypass','no_items','bad_email','blank_item','no_address','bad_date','wrong_district',...historical]);
 for(const [key,result] of Object.entries(results.validation))assert.equal((result as any).accepted,!rejected.has(key),`Validation regression: ${key}`);
 const cases=JSON.parse(readFileSync(root+'/contracts/pricing-cases.json','utf8'));
 results.pricing=cases.map((c:any)=>({match:JSON.stringify(totals(quoteSchema.parse(c.quote)))===JSON.stringify(c.expected),actual:totals(quoteSchema.parse(c.quote)),expected:c.expected}));

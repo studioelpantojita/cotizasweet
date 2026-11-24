@@ -17,7 +17,7 @@ jobs:
   quality-windows:
     name: Windows / Node 24 / Python 3.12 / .NET 10
     runs-on: windows-2025
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         shell: pwsh
@@ -163,6 +163,9 @@ jobs:
       - name: Run integrated OIDC, API, smoke, regression and browser journeys
         run: python tests/integration.py --backend all
 
+      - name: Verify current accounts, guests, promotion and administrator inbox in disposable services
+        run: python tests/current_acceptance.py
+
       - name: Smoke and bounded public load on the production build
         run: python tests/production_smoke.py
 
@@ -182,6 +185,13 @@ jobs:
             tests/artifacts/nuget-audit.json
             tests/artifacts/integration-results.json
             tests/artifacts/production-smoke.json
+            tests/artifacts/current-acceptance.json
+            tests/artifacts/account-workflow.json
+            tests/artifacts/guest-workflow.json
+            tests/artifacts/navidad-promotion-workflow.json
+            tests/artifacts/christmas-offer/report.json
+            tests/artifacts/guest-quote/report.json
+            tests/artifacts/navidad-registration/report.json
             tests/artifacts/pdf-layout.json
             tests/artifacts/python-tests.xml
             tests/artifacts/pdf/*.pdf

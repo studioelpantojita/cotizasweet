@@ -40,4 +40,6 @@ if(Test-Path -LiteralPath $settingsPath){
 @{node=$nodeExe;python=$venvPython;dotnet=$dotnetExe;ports=$ports} | ConvertTo-Json | Set-Content $settingsPath -Encoding utf8
 $privateConfig=Join-Path $projectRoot '.env.ruc.local'
 if(!(Test-Path $privateConfig)){Copy-Item (Join-Path $projectRoot '.env.ruc.example') $privateConfig}
-Write-Output 'Entorno preparado. Configura .env.ruc.local, abre EA-Cotiza.slnx y ejecuta EA.Cotiza.Local con F5.'
+& $nodeExe (Join-Path $projectRoot 'web/scripts/run-ts.cjs') (Join-Path $projectRoot 'web/scripts/provision-accounts.ts')
+if($LASTEXITCODE -ne 0){throw 'No se pudieron preparar las cuentas locales.'}
+Write-Output 'Entorno preparado. Consulta .local/ACCESOS-REVISION.html, configura .env.ruc.local y ejecuta EA.Cotiza.Local con F5.'

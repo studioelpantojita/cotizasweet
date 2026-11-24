@@ -18,7 +18,7 @@ var url=new Uri(issuer);
 var local=builder.Environment.IsDevelopment() && builder.Configuration["OIDC_ALLOW_LOCAL_HTTP"]=="true" && new[]{"localhost","127.0.0.1"}.Contains(url.Host);
 if(url.Scheme!="https" && !local)throw new InvalidOperationException("OIDC requiere HTTPS.");
 builder.WebHost.ConfigureKestrel(options=>options.Limits.MaxRequestBodySize=70000);
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options=>{
+builder.Services.AddAuthentication(AccountAuthentication.Selector).AddAccounts(builder.Configuration,builder.Environment).AddJwtBearer(options=>{
     options.Authority=issuer;options.Audience=audience;options.RequireHttpsMetadata=!local;options.MapInboundClaims=false;
     options.TokenValidationParameters=new(){ValidateIssuer=true,ValidIssuer=issuer,ValidateAudience=true,ValidAudience=audience,ValidateIssuerSigningKey=true,ValidateLifetime=true,RequireExpirationTime=true,RequireSignedTokens=true,ClockSkew=TimeSpan.FromSeconds(30),ValidAlgorithms=new[]{SecurityAlgorithms.RsaSha256}};
     options.Events=new JwtBearerEvents{
@@ -27,7 +27,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         OnForbidden=context=>{context.Response.StatusCode=403;return context.Response.WriteAsJsonAsync(new{error="Permiso insuficiente."});}
     };
 });
-bool HasScope(ClaimsPrincipal user,string scope)=>googleProvider
+bool HasScope(ClaimsPrincipal user,string scope)=>googleProvider && user.FindFirstValue("iss")==issuer
     ? OidcProvider.VerifiedGoogleIdentity(user,audience) && (scope is "quotes:read" or "quotes:write")
     : user.FindAll("scope").Concat(user.FindAll("scp")).Any(c=>c.Value.Split(' ',StringSplitOptions.RemoveEmptyEntries).Contains(scope));
 builder.Services.AddAuthorization(options=>{
@@ -61,7 +61,7 @@ _ = app.Services.GetRequiredService<CatalogStore>();
 app.Use(async(context,next)=>{context.Response.Headers.CacheControl="no-store";try{await next();}catch(BadHttpRequestException e){context.Response.StatusCode=e.StatusCode;await context.Response.WriteAsJsonAsync(new{error="Solicitud inválida o demasiado grande."});}catch{context.Response.StatusCode=503;await context.Response.WriteAsJsonAsync(new{error="No se pudo completar la operación."});}});
 app.UseAuthentication();app.UseRateLimiter();app.UseAuthorization();
 string Owner(ClaimsPrincipal user) {
-    var canonical=JsonSerializer.Serialize(new[]{issuer,user.FindFirstValue("sub")!},new JsonSerializerOptions{Encoder=JavaScriptEncoder.UnsafeRelaxedJsonEscaping});
+    var canonical=JsonSerializer.Serialize(new[]{user.FindFirstValue("iss")!,user.FindFirstValue("sub")!},new JsonSerializerOptions{Encoder=JavaScriptEncoder.UnsafeRelaxedJsonEscaping});
     return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
 }
 app.MapGet("/api/catalog",(CatalogStore store)=>Results.Json(store.Read()));
@@ -79,7 +79,8 @@ app.MapGet("/api/clients/ruc/{ruc}",async(string ruc,HttpRequest request,RucClie
 app.MapPost("/api/quotes",async(HttpRequest request,ClaimsPrincipal user,QuoteStore store,RucClient ruc)=>{
     if(!BackendSecurity.IsUtf8JsonContentType(request.ContentType))return Results.Json(new{error="Se requiere JSON con codificación UTF-8."},statusCode:415);
     JsonObject quote;
-    try{quote=QuoteDomain.Validate(await JsonNode.ParseAsync(request.Body),creating:true);}
+    var promotionEntitled=builder.Configuration["ACCOUNT_AUTH_ENABLED"]=="true" && user.FindFirstValue("iss")==builder.Configuration["ACCOUNT_ISSUER"] && user.FindFirstValue("role")=="customer" && user.FindFirstValue("promotion")=="navidad-2026";
+    try{quote=QuoteDomain.Validate(await JsonNode.ParseAsync(request.Body),creating:true,allowPromotion:promotionEntitled);}
     catch(Exception e) when(e is JsonException or ArgumentException or FormatException or InvalidOperationException){return Results.BadRequest(new{error="Cotización inválida. Revisa los campos."});}
     try{await ruc.Verify(quote,request.HttpContext.RequestAborted);}
     catch(RucException e){if(e.RetryAfter is int seconds)request.HttpContext.Response.Headers.RetryAfter=seconds.ToString();return Results.Json(new{error=e.Message},statusCode:e.Status);}

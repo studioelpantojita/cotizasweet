@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 from domain import validate_quote, totals
 from catalog_store import initialize_catalog, read_catalog
+from account_auth import configuration as account_configuration, is_account_token, verify_account_token
 from ruc_service import verify_quote_identity, validate_configuration, LookupError
 
 ISSUER = os.environ.get('OIDC_ISSUER', '')
@@ -104,6 +105,7 @@ def initialize_database():
 async def lifespan(app):
     global jwks
     validate_configuration()
+    account_configuration()
     if not ISSUER or not AUDIENCE:
         raise RuntimeError('Configura OIDC_ISSUER y OIDC_AUDIENCE.')
     validate_url(ISSUER)
@@ -139,27 +141,39 @@ async def http_error(request, exc):
     return JSONResponse({'error':exc.detail}, status_code=exc.status_code, headers=exc.headers)
 
 def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
-    if not credentials or not jwks:
+    if not credentials:
         raise HTTPException(401,'Token requerido.',headers={'WWW-Authenticate':'Bearer'})
     try:
-        key = jwks.get_signing_key_from_jwt(credentials.credentials)
-        claims = jwt.decode(credentials.credentials,key.key,algorithms=['RS256'],audience=AUDIENCE,issuer=ISSUER,options={'require':['exp','iss','aud','sub','iat']},leeway=30)
+        account_token = is_account_token(credentials.credentials)
+        if account_token: claims = verify_account_token(credentials.credentials)
+        else:
+            if not jwks:raise ValueError('Identidad externa no disponible')
+            key = jwks.get_signing_key_from_jwt(credentials.credentials)
+            claims = jwt.decode(credentials.credentials,key.key,algorithms=['RS256'],audience=AUDIENCE,issuer=ISSUER,options={'require':['exp','iss','aud','sub','iat']},leeway=30)
         if not isinstance(claims['sub'],str) or not claims['sub']:
             raise ValueError('Subject inválido')
-        if OIDC_PROVIDER=='google':
+        if OIDC_PROVIDER=='google' and not account_token:
             multiple_audiences=isinstance(claims['aud'],list) and len(claims['aud'])>1
             if (claims.get('email_verified') is not True or claims.get('azp',AUDIENCE)!=AUDIENCE
                     or (multiple_audiences and claims.get('azp')!=AUDIENCE)):
                 raise ValueError('Cuenta de Google no verificada')
     except Exception:
         raise HTTPException(401,'Token inválido o expirado.',headers={'WWW-Authenticate':'Bearer'})
-    owner = hashlib.sha256(json.dumps([ISSUER,claims['sub']],ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
-    scopes = 'quotes:read quotes:write' if OIDC_PROVIDER=='google' else claims.get('scope',claims.get('scp',''))
+    owner = hashlib.sha256(json.dumps([claims['iss'],claims['sub']],ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
+    scopes = 'quotes:read quotes:write' if OIDC_PROVIDER=='google' and not account_token else claims.get('scope',claims.get('scp',''))
     if not isinstance(scopes,str): scopes = ''
     return owner, scopes.split()
 
 def reject_json_constant(value):
     raise ValueError('Número JSON inválido')
+
+def trusted_promotion(credentials:HTTPAuthorizationCredentials | None = Depends(bearer)):
+    if not credentials:return False
+    try:
+        if not is_account_token(credentials.credentials):return False
+        claims=verify_account_token(credentials.credentials)
+        return claims.get('role')=='customer' and claims.get('promotion')=='navidad-2026'
+    except Exception:return False
 
 def record(row):
     quote = None
@@ -222,13 +236,13 @@ def get_quotes(request: Request,user=Depends(identity)):
     return {'quotes':[record(row) for row in page], 'nextCursor': next_cursor}
 
 @app.post('/api/quotes',status_code=201)
-async def post_quote(request:Request,user=Depends(identity)):
+async def post_quote(request:Request,user=Depends(identity),promotion_entitled:bool=Depends(trusted_promotion)):
     owner, scopes = user
     if 'quotes:write' not in scopes: raise HTTPException(403,'Permiso quotes:write requerido.')
     rate_limit(owner,'write')
     value=await read_quote_body(request)
     try:
-        q=validate_quote(value,creating=True)
+        q=validate_quote(value,creating=True,allow_promotion=promotion_entitled is True)
     except (ValueError,TypeError,KeyError):
         raise HTTPException(400,'Cotización inválida. Revisa los campos.')
     try:

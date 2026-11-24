@@ -1,68 +1,71 @@
-# E&A Cotiza 2.3.0 · Experiencia de navegación y cotización
+# E&A Cotiza 2.3.0 · Actualización funcional local
 
-Fecha de preparación: 21 de noviembre de 2026. Esta versión parte de la entrega local 2.2.1, commit `faba33f1738377063f13e92dab31c57ccde8fdd5`, y atiende las seis observaciones visuales del propietario. Se prepara en `outputs/CotizaSweet_v2.3.0`. La carpeta 2.2.1 conserva sus fuentes y datos. Esta revisión utiliza nuevas bases, puertos y archivos de compilación; no migra automáticamente sus cotizaciones.
+Actualización vigente del 23 de noviembre: el registro es opcional para cotizar y enviar; la campaña navideña y su validación se describen en [NAVIDAD-INVITADOS-2026-11-23.md](NAVIDAD-INVITADOS-2026-11-23.md). Las notas del 22 de noviembre que siguen documentan el antecedente de esta misma versión.
 
-La publicación en GitHub y la continuación del despliegue requieren aprobación expresa del propietario. Los resultados anteriores se conservan como antecedentes de sus respectivas versiones en [UPGRADE-2.2.1.md](UPGRADE-2.2.1.md) y [AUDITORIA-2.2.md](AUDITORIA-2.2.md).
+Documento actualizado el **22 de noviembre de 2026**. Las observaciones visuales del 21 de noviembre y las mejoras funcionales del 22 de noviembre se aplican sobre la misma carpeta `outputs/CotizaSweet_v2.3.0`, sin crear una versión adicional por cada punto. La copia 2.2.1 conserva sus fuentes y datos como referencia; esta actualización no la modifica ni migra automáticamente sus cotizaciones.
 
-## Observaciones atendidas
+La entrega permanece local. Publicar en GitHub o continuar el despliegue requiere la aprobación expresa del propietario. El acta de esta actualización y los resultados finales se documentan en [NUEVAS-OBSERVACIONES-2026-11-22.md](NUEVAS-OBSERVACIONES-2026-11-22.md). Las evidencias de entregas anteriores constituyen antecedentes y no validan por sí mismas estas fuentes modificadas.
 
-| Solicitud del propietario | Cambio de esta versión | Criterio de aceptación |
+## Mejoras incorporadas
+
+| Solicitud | Comportamiento actual | Aceptación principal |
 |---|---|---|
-| Corregir el aspecto del buscador en `/catalogo?seleccion=packs` | Se corrige la superposición visual de los estados de foco del contenedor y del campo. El buscador conserva un indicador visible de foco, su icono, la búsqueda y la acción Limpiar | Al enfocar y escribir no aparecen dos marcos superpuestos ni se desplaza el icono. Filtrar y limpiar actualizan los resultados y funcionan con teclado |
-| Retirar Proyecto y utilizar Detalle del Proyecto en el PDF | Se retira el control Proyecto de Tu negocio y tu cliente. Objetivo del cliente pasa a Objetivo del Proyecto y Detalle del objetivo pasa a Detalle del Proyecto | El detalle completo, hasta el límite de 600 unidades del formulario, aparece en la vista previa y el PDF. Si un registro antiguo no tenía detalle, conserva su título como contenido inicial |
-| Abrir una ficha al pulsar fotografías de inicio | Las fotografías de la portada, las selecciones, las colecciones, Cómo Funciona y Packs y cajas abren un diálogo con imagen, nombre, descripción y datos de referencia | Pulsar la fotografía mantiene la dirección de la página. Se puede cerrar con el control visible o Escape y volver al elemento que la abrió. Ir al cotizador requiere la acción independiente de la ficha |
-| Reducir la fatiga del formulario conservando sus campos y secciones | El cotizador se organiza en cuatro pasos con barra lateral numerada, progreso y botones Anterior y Continuar. El contenido permanece en el estado de la propuesta al cambiar de paso | Se puede recorrer, volver atrás, guardar un borrador, reabrir registros y completar los mismos campos. Los errores de exportación o guardado llevan al paso y control correspondientes |
-| Corregir la navegación y su posición | La cabecera comparte Catálogo, Cómo Funciona y Accede a la derecha de la marca. En móvil se despliegan desde el menú | Los tres destinos funcionan, la marca permite regresar a Inicio y el acceso identifica una sesión iniciada con Cerrar sesión en el cotizador |
-| Reducir botones repetidos | La portada dirige primero al catálogo y a la elección de ocasión. Se mantienen dos accesos visibles al cotizador, en la selección de ocasión y en el pie. Las fotografías abren fichas mediante un único control por imagen | No se repite Explorar presentación en cada tarjeta ni Cotizar mi proyecto en la cabecera, el hero y las secciones promocionales. Los accesos que quedan conservan el contexto del proyecto |
+| Administrador de la plataforma | Cuentas locales con roles administrador y cliente. Bandeja administrativa de solicitudes y creación de cuentas de cliente | Un cliente no obtiene acceso a la administración ni a documentos de otras cuentas |
+| Acceso obligatorio con User y Password | El cotizador exige una sesión. El registro público crea clientes. Contraseñas derivadas con scrypt, sales aleatorias, límites de intentos y sesiones revocables al cambiar la contraseña | El acceso vacío o incorrecto falla; cambiar el rol en una solicitud no concede privilegios |
+| Contador debajo del recuadro | El contador de Detalle del Proyecto aparece debajo, alineado a la izquierda, con el límite de 600 | Comprobado en escritorio y móvil; el texto completo se utiliza en el PDF |
+| Tipo de cliente y fecha del evento | Solo Persona Natural y Empresa para propuestas nuevas; DNI para persona natural, RUC para empresa y fecha del evento obligatoria | Validación en interfaz y servidor, conservando la lectura de registros históricos |
+| Paquetes en el primer paso | Elige el paquete para tu evento. permanece junto al proyecto y cliente, con selección opcional y sugerencias de la colección correspondiente | Las cuatro colecciones muestran sus propuestas y permiten continuar sin paquete |
+| Revisión representativa antes de seleccionar | Sugerido para revisar abre un diálogo con imágenes, productos, cantidades, insumos y precios de referencia. Elegir este paquete es una acción independiente | Abrir o cerrar el diálogo no modifica servicios; confirmar carga el paquete explícitamente |
+| Segundo paso simplificado | Las secciones principales son Servicios de la propuesta y Ficha de insumos, esta última opcional. La cartera tiene seis accesos representativos | Se conservan moneda, líneas de servicios, personalización e insumos sin duplicar el apartado de paquetes |
+| Producto personalizado | De uno a cuatro sabores de la lista aprobada; presentación obligatoria; alcance opcional con Unknown. cuando está vacío; cantidad editable | Sabores, presentación, alcance y cantidad se conservan en la propuesta y el documento |
+| Precio y unidad definidos por producto | Tarifa referencial compartida en `contracts/product-pricing.json`, importes independientes PEN/USD y unidad fijada por producto | El cliente no los edita. Los tres backends rechazan la manipulación del precio y la unidad al crear una propuesta nueva |
+| Servicio sin referencia | Precio 0 y unidad servicio como solicitud pendiente de evaluación; se identifica el total provisional | No permite introducir una tarifa arbitraria ni presentar el importe pendiente como definitivo |
+| Entrega y condiciones según la referencia | Modalidad, dirección y movilidad; fechas de emisión y validez en una fila; información de IGV; condiciones y notas; anticipo del 50% sin control editable | Recojo 0%, locación 5% antes de IGV del 18%; anticipo informado en el resumen y en el documento |
+| Guardar y enviar | Guardar y descargar PDF conserva una copia en el historial y descarga el documento; Enviar Cotización entrega esa copia al administrador | Documento generado en servidor, archivo PDF con SHA-256 y aislamiento por cuenta; envío repetido sin duplicación |
+| Correo cuando esté configurado | La bandeja administrativa es el canal operativo de esta entrega; el correo externo aparece pendiente | No se declara enviado ni recibido un correo sin proveedor y configuración verificados |
 
-La corrección del buscador atiende su presentación y foco. Los filtros por categoría, el tratamiento de tildes y las opciones comerciales siguen disponibles. Las monedas PEN y USD mantienen sus importes declarados sin conversión automática.
+Los sabores admitidos son **vainilla, chocolate, café, frambuesa, lucuma, naranjo, cherry, crema pastelera, pistacho y almendras**. Las unidades del catálogo pertenecen al conjunto **unidad, gramos, kilogramos, litros, box y paquete**, según la referencia de producto. Las tarifas iniciales fueron autorizadas como valores de prueba; necesitan confirmación del negocio antes del uso comercial. Su revisión se realiza en la configuración del catálogo; la cuenta de cliente no modifica las tarifas.
 
-## Campos y funciones conservados
+Se mantienen las mejoras de navegación anteriores: fotografías de inicio que abren fichas sin redirección, navegación Catálogo / Cómo Funciona / Accede o Mi cuenta, reducción de botones repetidos y buscador del catálogo con un indicador de foco claro. La marca vectorial E&A Cotiza y la tipografía local permanecen integradas.
 
-| Paso nuevo | Contenido existente que permanece disponible |
+## Cuentas, documentos y datos
+
+El documento privado `.local/ACCESOS-REVISION.html` reúne los accesos de administrador y cliente de esta instalación. No forma parte del repositorio ni del paquete de fuentes. El formulario exige User y Password; la antigua entrada automática con Desarrollo local ya no corresponde al recorrido actual. La contraseña de E&A Cotiza es independiente de la de Gmail. `/cuenta` permite cambiarla y cerrar sesión.
+
+Los roles se comprueban en el servidor. Los tokens de las cuentas de aplicación usan un emisor explícito y un algoritmo permitido, separados del perfil OIDC externo. Las sesiones locales distinguen el puerto de esta instalación para evitar interferencias con 2.2.1. Google real conserva su aceptación externa separada; el acceso local comprobado no constituye evidencia de acceso real con Google.
+
+El guardado crea un documento PDF en el servidor y conserva una copia inmutable con su huella SHA-256. El historial pertenece a la cuenta autenticada. El envío utiliza esa copia ya guardada y produce un recibo; una repetición del envío de la misma copia no crea otra solicitud. El administrador solo recibe propuestas que el cliente haya enviado expresamente. Modificar la propuesta requiere volver a guardar antes de enviar los cambios; el archivo ya remitido conserva sus datos originales.
+
+El historial de cotizaciones y los documentos archivados utilizan almacenamiento persistente propio. Los respaldos de la API no sustituyen el respaldo de las cuentas, sesiones y documentos web: deben incluirse los volúmenes y bases correspondientes en la operación del alojamiento. Las configuraciones privadas, claves, accesos, bases y logs se excluyen de las fuentes públicas.
+
+## Compatibilidad y estado del formulario
+
+El contrato conserva `event` y `projectBrief`. Detalle del Proyecto mantiene íntegro el contenido en `projectBrief` y calcula un resumen compatible en `event`. El resumen normaliza espacios y evita cortar una pareja UTF-16 al límite. La vista previa y el PDF prefieren el detalle completo; los registros anteriores sin detalle conservan el título antiguo como contenido inicial.
+
+Los cuatro paneles permanecen montados y los inactivos se ocultan y quedan fuera del recorrido con teclado. Esto conserva el estado al volver entre pasos. El borrador admite una propuesta incompleta, incluso sin servicios, y se conserva únicamente en esta pestaña. Guardar borrador no crea una copia en el historial del servidor. La validación final exige una propuesta completa y lleva el foco al campo que necesita corregirse.
+
+Las cotizaciones históricas conservan sus datos para lectura. Las reglas nuevas de fecha, tipo de documento, precio de catálogo y anticipo se exigen al crear o volver a guardar una propuesta nueva; no se reescriben las propuestas anteriores de forma silenciosa.
+
+## Evidencias y límites
+
+Las suites tienen alcances diferentes y no deben sumarse como cobertura única. Las cifras finales y sus artefactos corresponden al acta del [22 de noviembre](NUEVAS-OBSERVACIONES-2026-11-22.md). Durante esta actualización se ejecutaron pruebas web de dominio y tarifas, backend Python y .NET, validaciones de cuentas y documentos y recorridos de navegador. El recorrido específico de interfaz aprobó **34 comprobaciones**, y el flujo de cuentas, archivo PDF y envío administrativo aprobó **39 comprobaciones** con datos sintéticos.
+
+| Área | Evidencia de la actualización |
 |---|---|
-| 1 · Proyecto y cliente | Objetivo del Proyecto, presupuesto máximo, Detalle del Proyecto, tipo de cliente, DNI/RUC, nombre o razón social, consulta y reintento RUC, contacto del negocio con prefijo Perú, correo opcional, fecha opcional del evento y contacto del cliente de registros anteriores cuando exista |
-| 2 · Servicios e insumos | Paquetes Esencial, Signature y Alta Vitrina; sugerencia y comparación de presupuesto; moneda; cartera de referencias; personalización de contenido, presentación y alcance; packs y adicionales; servicio sin referencia; categoría, nombre, descripción, unidad, cantidad y precio de cada servicio; eliminación de servicios; ficha opcional de insumos, sus categorías y opciones, porcentaje de cacao, especificaciones adicionales, notas automáticas y notas históricas |
-| 3 · Entrega y condiciones | Recojo o servicio en locación, ciudad o provincia, distrito, dirección o referencia, movilidad calculada, fecha de emisión, validez, IGV, anticipo y condiciones de alcance, entrega, revisiones y pago |
-| 4 · Revisar propuesta | Vista de cliente y detalle, servicios, insumos y condiciones; moneda, subtotales, movilidad, IGV, total, anticipo y saldo; vista previa PDF, descarga, guardado y compartición; identificación de datos comerciales referenciales y de RUC de demostración |
+| Dominio web y tarifas | `tests/artifacts/unit-results.json` y pruebas específicas de reglas de producto |
+| Backend y seguridad Python | Resultados de las suites de backend de esta actualización, incluidos los casos de precios, unidades, fecha y JWT |
+| API .NET | Compilación Debug y Release y pruebas de validación de backend |
+| Interfaz de las nuevas observaciones | `tests/artifacts/improvements-ux/report.json` y capturas de escritorio y móvil |
+| Cuentas y recepción en bandeja | `tests/artifacts/account-workflow.json`, con aislamiento entre cuentas y envío idempotente |
+| Producción local | Smoke y navegador adaptados a acceso obligatorio con cuentas y base temporal; resultados finales en el acta |
+| Docker final 2.3.0 | Reconstrucción y ejecución final pendientes de verificar; no se extrapola el resultado de 2.2.1 |
 
-Se corrigió además la conservación de borradores incompletos sin servicios. El esquema de borrador admite de cero a 30 líneas, mientras la validación final continúa exigiendo una propuesta completa. Las comprobaciones de cantidad, tipos y precios por línea permanecen vigentes.
+Los resultados antiguos de 856 comprobaciones HTTP, los conteos previos de PDF, el p95 anterior y los informes de mutación pertenecen a sus fuentes y ejecuciones originales. No se presentan como repetidos sobre esta actualización. Una compilación local o una prueba sintética tampoco acredita la operación en Railway, un envío externo de correo ni una certificación externa de seguridad.
 
-Se mantienen el historial por cuenta, su paginación, el tratamiento de registros anteriores, las sesiones, los controles de origen, la cuota RUC persistente y las opciones de respaldos de 2.2.1. El borrador se conserva en la pestaña del navegador. Guardar borrador no crea una versión del historial del servidor y no acredita una copia recuperable fuera de esa pestaña.
+## Revisión local y publicación
 
-Durante la prueba del nuevo recorrido se corrigió el esquema de borrador para aceptar una propuesta que todavía no contiene servicios. La validación final conserva su exigencia de al menos un servicio y los límites de cantidad, precio y longitud. La prueba de navegador confirma que un borrador sin servicios conserva sus datos y su paso al recargar.
+La web usa el puerto **3370**, la API .NET **8370**, RUC Python **8371** y el emisor sintético de compatibilidad **9370**. [REVISION-MANUAL-2.3.md](REVISION-MANUAL-2.3.md) describe las cuentas, los recorridos y los criterios del propietario. Abre [INICIAR-EN-VISUAL-STUDIO.slnx](../INICIAR-EN-VISUAL-STUDIO.slnx) y selecciona EA.Cotiza.Local para revisar o ejecutar el código.
 
-El informe `tests/artifacts/preservation-check.json` comprueba que diez archivos de implementación coinciden con 2.2.1, incluidos logística, insumos, editor de servicios, moneda, personalización de referencias, paquetes, dominio financiero Python/.NET, respaldos y contrato compartido.
+El RUC `20999999990` identifica una demostración ficticia; no representa una consulta real a SUNAT o Decolecta. Los datos comerciales de Dulce Atelier, las fotografías, los precios y la disponibilidad conservan su condición referencial.
 
-## Compatibilidad del detalle del proyecto
-
-El contrato de las API conserva `event` y `projectBrief`. Al editar Detalle del Proyecto, el contenido íntegro queda en `projectBrief` y se calcula un resumen de hasta 120 unidades UTF-16 para `event`. El resumen limpia las separaciones de línea y evita dejar media pareja surrogate en su límite. Esta adaptación no cambia fórmulas ni importes.
-
-La vista previa y el PDF toman primero el detalle completo. Los registros anteriores que solo contenían el antiguo título lo usan como fallback. Los que ya tenían un detalle conservan ese contenido. Borrar el nuevo campo también borra su resumen compatible para que la validación requerida continúe funcionando. El PDF incluye el detalle una sola vez, permite su continuación entre páginas y mantiene la firma vectorial y el texto referencial del negocio.
-
-## Evidencia y estado de validación
-
-Las suites tienen alcances diferentes y no deben sumarse como cobertura única. La evidencia se registra en los artefactos de esta carpeta y debe vincularse al commit o paquete final de 2.3.0. Los resultados y capturas contienen datos sintéticos y se entregan fuera del repositorio. Los scripts de las pruebas forman parte de las fuentes para poder repetirlas.
-
-| Comprobación de 2.3.0 | Estado durante la preparación de esta guía | Evidencia o alcance |
-|---|---|---|
-| Unitarias web | 53 pruebas aprobadas | `tests/artifacts/unit-results.json`, incluidas siete pruebas de detalle, compatibilidad y límite Unicode, y una regresión de borrador sin servicios |
-| Backend y operaciones Python | 94 pruebas y 123 subtests aprobados | `tests/artifacts/python-tests.xml` |
-| Backend y respaldos .NET | 123 aserciones aprobadas | `tests/artifacts/dotnet-backend.txt` |
-| Regresión PDF | 14 documentos y 38 páginas comprobados | `tests/artifacts/pdf-results.json`, `pdf-layout.json` y el caso de servicio a medida. Incluye 600 unidades, múltiples líneas, marcador final y fallback histórico |
-| Build web de producción | Aprobado | Compilación local del código de esta copia |
-| Integración HTTP | 856 comprobaciones aprobadas | Tres backends con perfiles sintéticos estándar y Google. Resultado en `tests/artifacts/integration-results.json` |
-| End-to-end de los perfiles estándar y Google sintético | 24 comprobaciones aprobadas por perfil | Navegador real sobre los servicios de prueba. `tests/artifacts/browser/results.json` y `browser-google/results.json` |
-| Smoke y navegador del build de producción | Cinco rutas y 11 comprobaciones de navegador aprobadas | Build final con TLS efímero local, CSP, PDF y diseño móvil. 80 solicitudes a concurrencia 8, p95 73,09 ms, umbral previo de 2000 ms |
-| Revisión de las seis observaciones de UX | 12 comprobaciones de inicio/catálogo y 14 del cotizador aprobadas | 24 fotografías con modal, seis familias de fichas, búsqueda y limpieza, menú móvil, estado de los pasos, borrador sin servicios y foco de campos inválidos |
-| Imágenes Docker 2.3.0 | Reconstrucción pendiente | El motor Linux no estaba disponible en esta sesión. La aceptación de las tres imágenes de 2.2.1 pertenece a aquella entrega. El build de producción y los tres servicios nativos de 2.3.0 se comprobaron localmente |
-
-El detalle de 600 unidades se comprobó íntegro en la extracción del PDF, incluso entre páginas, y sin duplicación. Las pruebas conservan los casos financieros y la validación del contrato. También se renderizaron e inspeccionaron las dos páginas de `detail_maximum.pdf` y la muestra `test_project.pdf`: el contenido, el resumen económico y los pies de marca se leen sin solapamientos. La comprobación de caracteres y firma se complementa así con inspección visual.
-
-## Revisión local y límites
-
-La web de esta revisión usa `http://127.0.0.1:3370`, la API .NET el puerto 8370, RUC Python el 8371 y la identidad local el 9370. El acceso de desarrollo se completa desde Accede con **Desarrollo local**, correo **local@example.test**, sin contraseña. El RUC `20999999990` es una demostración ficticia y no representa una consulta real de SUNAT o Decolecta.
-
-[REVISION-MANUAL-2.3.md](REVISION-MANUAL-2.3.md) contiene los recorridos para el propietario. Abre [INICIAR-EN-VISUAL-STUDIO.slnx](../INICIAR-EN-VISUAL-STUDIO.slnx) y selecciona `EA.Cotiza.Local` para revisar o ejecutar el proyecto. La configuración privada, las bases, los logs y las dependencias instaladas permanecen fuera del paquete de fuentes.
-
-El inicio de sesión con Google real, Decolecta con credencial vigente, el alojamiento Railway con HTTPS y controles efectivos del máximo de US$30 mensuales, las copias fuera del volumen y su recuperación, y la confirmación de información comercial y condiciones legales conservan sus aceptaciones externas pendientes. Esta entrega documenta comprobaciones locales y no constituye una certificación externa ni una garantía de ausencia de vulnerabilidades. La publicación y las pruebas remotas sobre el commit final se realizarán después de la aprobación del propietario. No se añadieron dependencias; los cambios de los archivos de bloqueo npm corresponden al número de versión del proyecto. Los resultados antiguos de mutación y capacidad corresponden a sus suites y versiones originales, sin sumarse a estas pruebas de interfaz.
+El correo externo, Google y Decolecta reales, el dominio público HTTPS, el alojamiento Railway y sus controles efectivos del máximo de **US$30 mensuales**, los respaldos fuera del volumen y su restauración requieren configuración y pruebas propias. No se activa un plan de pago ni se publica código por esta entrega. El propietario revisará manualmente v2.3.0 y dará su aprobación expresa antes de cargarla en GitHub.

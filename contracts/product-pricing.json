@@ -1,0 +1,34 @@
+{
+  "revision": "referencial-pruebas-2026-11-22",
+  "referencePrices": true,
+  "note": "Configuración referencial para pruebas. Los importes de cada moneda son independientes; no se aplica conversión automática. El negocio debe aprobar la tarifa antes de uso comercial.",
+  "flavors": ["vainilla", "chocolate", "café", "frambuesa", "lucuma", "naranjo", "cherry", "crema pastelera", "pistacho", "almendras"],
+  "saleUnits": ["unidad", "gramos", "kilogramos", "litros", "box", "paquete"],
+  "catalog": {
+    "breakfast": {"unit": "box", "prices": {"PEN": 8500, "USD": 8500}},
+    "minibox": {"unit": "box", "prices": {"PEN": 14400, "USD": 14400}},
+    "sweet": {"unit": "paquete", "prices": {"PEN": 21000, "USD": 21000}},
+    "macarons": {"unit": "paquete", "prices": {"PEN": 3600, "USD": 3600}},
+    "etiquetas": {"unit": "unidad", "prices": {"PEN": 200, "USD": 200}},
+    "empaque": {"unit": "unidad", "prices": {"PEN": 1800, "USD": 1800}}
+  },
+  "portfolio": {
+    "delicia-fresas": {"unit": "unidad", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "macarons-napoleon": {"unit": "box", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "chocolates-royale": {"unit": "box", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "tarta-pistacho": {"unit": "unidad", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "cheesecake-frutos-rojos": {"unit": "unidad", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "macarons-valentin": {"unit": "box", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "ositos-leche": {"unit": "paquete", "prices": {"PEN": 3600, "USD": 3600}, "basis": "macarons"},
+    "cheesecake-new-york": {"unit": "unidad", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "tarta-frutos-rojos": {"unit": "unidad", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "macarons-eugenie": {"unit": "box", "prices": {"PEN": 21000, "USD": 21000}, "basis": "sweet"},
+    "chocolates-champs": {"unit": "box", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "lucuma": {"unit": "unidad", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "macarons-intemporel": {"unit": "box", "prices": {"PEN": 21000, "USD": 21000}, "basis": "sweet"},
+    "ositos-oscuro": {"unit": "paquete", "prices": {"PEN": 3600, "USD": 3600}, "basis": "macarons"},
+    "tocino-cielo": {"unit": "unidad", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"},
+    "osito-xxl": {"unit": "unidad", "prices": {"PEN": 8500, "USD": 8500}, "basis": "breakfast"},
+    "pera-tropical": {"unit": "unidad", "prices": {"PEN": 14400, "USD": 14400}, "basis": "minibox"}
+  }
+}

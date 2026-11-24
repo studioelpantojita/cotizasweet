@@ -7,6 +7,7 @@ import {cookieName,cookieOptions} from '@/server/session';
 import {rateLimit} from '@/server/rate-limit';
 export const runtime='nodejs';
 export async function GET(request:Request) {
+  if(process.env.OIDC_EXTERNAL_LOGIN_ENABLED!=='true')return NextResponse.json({error:'El acceso externo no está habilitado.'},{status:404});
   try {
     const limited=rateLimit(request,'login');if(limited)return limited;
     const config=await oidcConfig(),verifier=oidc.randomPKCECodeVerifier(),state=oidc.randomState(),nonce=oidc.randomNonce();

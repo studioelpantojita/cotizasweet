@@ -114,6 +114,61 @@ foreach(var mutate in new Action<JsonObject>[] {
     var rejected=false;try{QuoteDomain.Validate(quote,creating:true);}catch(ArgumentException){rejected=true;}
     Check(rejected,"Unknown quote contract property accepted");
 }
+// New business requirements apply on creation, while historical documents keep their values.
+JsonObject ProductQuote() {
+    var value=JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"contracts","example-quote.json")))!.AsObject();
+    value["items"]=JsonNode.Parse("""[{"id":"synthetic-service","portfolioId":"delicia-fresas","name":"Delicia de fresas","image":"none","category":"pack","flavors":["vainilla","chocolate"],"presentation":"Caja marfil","scope":"Unknown.","description":"Contenido: vainilla, chocolate\nPresentación: Caja marfil\nAlcance: Unknown.","quantity":2,"priceCents":14400,"unit":"unidad"}]""");
+    return value;
+}
+foreach(var mutate in new Action<JsonObject>[] {
+    q=>q["eventDate"]="",q=>q["advancePercent"]=30,
+    q=>{q["documentType"]="ruc";q["clientDocument"]="10999999994";},
+    q=>q["items"]![0]!["priceCents"]=0,q=>q["items"]![0]!["unit"]="box",
+    q=>q["items"]![0]!["flavors"]=JsonNode.Parse("[\"vainilla\",\"vainilla\"]"),
+    q=>q["items"]![0]!["flavors"]=JsonNode.Parse("[\"vainilla\",\"chocolate\",\"café\",\"pistacho\",\"almendras\"]"),
+    q=>q["items"]![0]!["presentation"]="",q=>q["items"]![0]!["description"]="Texto manipulado",
+    q=>q["items"]![0]!["catalogId"]="minibox",
+    q=>{q["items"]![0]!.AsObject().Remove("portfolioId");q["items"]![0]!.AsObject().Remove("flavors");q["items"]![0]!.AsObject().Remove("presentation");q["items"]![0]!.AsObject().Remove("scope");}
+}) {
+    var q=ProductQuote();mutate(q);var rejected=false;
+    try{QuoteDomain.Validate(JsonNode.Parse(q.ToJsonString()),creating:true);}catch(ArgumentException){rejected=true;}
+    Check(rejected,"Creation accepted missing date, wrong advance or manipulated product");
+}
+var validProduct=ProductQuote();validProduct["items"]![0]!["scope"]="";
+Check(QuoteDomain.S(QuoteDomain.Validate(validProduct,creating:true)["items"]![0]!,"scope")=="Unknown.","Optional scope did not canonicalize");
+var historicalProduct=ProductQuote();historicalProduct["eventDate"]="";historicalProduct["advancePercent"]=30;historicalProduct["items"]![0]!["priceCents"]=15000;
+Check(QuoteDomain.N(QuoteDomain.Validate(JsonNode.Parse(historicalProduct.ToJsonString()))["items"]![0]!,"priceCents")==15000,"Historical tariff was rewritten");
+// Promotion is immutable on historical reads, and independently authorized on creation.
+JsonObject PromotionQuote(string eventDate="2026-11-30") {
+    var value=ProductQuote();value["issued"]="2026-11-23";value["validUntil"]="2026-12-14";value["eventDate"]=eventDate;
+    value["promotion"]=JsonNode.Parse("""{"campaignId":"navidad-2026","percent":20}""");return value;
+}
+var campaignNow=DateTimeOffset.Parse("2026-11-23T17:00:00Z",System.Globalization.CultureInfo.InvariantCulture);
+foreach(var eventDate in new[]{"2026-11-30","2026-12-01","2026-12-31","2027-01-02"})
+    Check(QuoteDomain.N(QuoteDomain.Validate(PromotionQuote(eventDate),creating:true,allowPromotion:true,now:campaignNow)["promotion"]!,"percent")==20,"Eligible event endpoint rejected");
+foreach(var scenario in new[]{
+    (Entitled:false,Clock:campaignNow,Event:"2026-11-30"),
+    (Entitled:true,Clock:DateTimeOffset.Parse("2026-11-23T04:59:59Z"),Event:"2026-11-30"),
+    (Entitled:true,Clock:DateTimeOffset.Parse("2027-01-03T05:00:00Z"),Event:"2026-11-30"),
+    (Entitled:true,Clock:campaignNow,Event:"2026-11-29"),
+    (Entitled:true,Clock:campaignNow,Event:"2027-01-03")
+}){
+    var rejected=false;try{QuoteDomain.Validate(PromotionQuote(scenario.Event),creating:true,allowPromotion:scenario.Entitled,now:scenario.Clock);}catch(ArgumentException){rejected=true;}
+    Check(rejected,"Unauthorized, expired or out-of-event-range promotion accepted");
+}
+foreach(var clock in new[]{"2026-11-23T05:00:00Z","2027-01-03T04:59:59Z"})
+    Check(QuoteDomain.Validate(PromotionQuote(),creating:true,allowPromotion:true,now:DateTimeOffset.Parse(clock))["promotion"]!=null,"Peru day boundary rejected");
+var promotedTotals=QuoteDomain.Totals(QuoteDomain.Validate(PromotionQuote(),creating:true,allowPromotion:true,now:campaignNow));
+Check(promotedTotals["discount"]==5760 && promotedTotals["netServices"]==23040 && promotedTotals["tax"]==4147 && promotedTotals["total"]==27187 && promotedTotals["advance"]==13594,"Discount cent parity failed");
+var deliveredPromo=PromotionQuote();deliveredPromo["locationMode"]="on_location";deliveredPromo["provinceId"]="1501";deliveredPromo["districtId"]="150130";deliveredPromo["address"]="Referencia QA";
+var deliveredTotals=QuoteDomain.Totals(QuoteDomain.Validate(deliveredPromo,creating:true,allowPromotion:true,now:campaignNow));
+Check(deliveredTotals["mobility"]==1152 && deliveredTotals["base"]==24192 && deliveredTotals["tax"]==4355 && deliveredTotals["total"]==28547,"Discount must precede mobility and IGV");
+Check(QuoteDomain.Validate(PromotionQuote(),now:DateTimeOffset.Parse("2028-01-01T00:00:00Z"))["promotion"]!=null,"Expired campaign broke a historical document");
+foreach(var meta in new[]{"""{"campaignId":"other","percent":20}""","""{"campaignId":"navidad-2026","percent":100}""","""{"campaignId":"navidad-2026","percent":20,"extra":true}"""}){
+    var candidate=PromotionQuote();candidate["promotion"]=JsonNode.Parse(meta);var rejected=false;
+    try{QuoteDomain.Validate(candidate,creating:true,allowPromotion:true,now:campaignNow);}catch(ArgumentException){rejected=true;}
+    Check(rejected,"Manipulated promotion metadata accepted");
+}
 // Regression for stable paging, legacy/corrupt rows and owner separation.
 var historyRoot = Directory.CreateTempSubdirectory("cotiza-history-test-");
 try

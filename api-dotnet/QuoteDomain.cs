@@ -11,6 +11,7 @@ public static class QuoteDomain
     static readonly JsonSchema Schema = JsonSchema.FromText(Raw.ToJsonString());
     static readonly JsonArray Ingredients = JsonNode.Parse(File.ReadAllText(Path.Combine(Root,"ingredients.json")))!.AsArray();
     static readonly JsonNode Ubigeo = JsonNode.Parse(File.ReadAllText(Path.Combine(Root,"ubigeo.json")))!;
+    static readonly JsonNode Pricing = JsonNode.Parse(File.ReadAllText(Path.Combine(Root,"product-pricing.json")))!;
     public static string S(JsonNode q,string field) => q[field]?.GetValue<string>() ?? "";
     public static long N(JsonNode q,string field) => (long)q[field]!.GetValue<decimal>();
     static bool B(JsonNode q,string field) => q[field]?.GetValue<bool>() ?? false;
@@ -44,7 +45,7 @@ public static class QuoteDomain
         if(node is JsonArray array) return new JsonArray(array.Select(Normalize).ToArray());
         return node?.DeepClone();
     }
-    public static JsonObject Validate(JsonNode? value,bool creating=false)
+    public static JsonObject Validate(JsonNode? value,bool creating=false,bool allowPromotion=false,DateTimeOffset? now=null)
     {
         Require(value is JsonObject,"Se requiere un objeto JSON.");
         var q=Normalize(value)!.AsObject();
@@ -62,12 +63,41 @@ public static class QuoteDomain
         DateOnly Parse(string s) => DateOnly.ParseExact(s,"yyyy-MM-dd",CultureInfo.InvariantCulture);
         var issued=Parse(S(q,"issued"));var valid=Parse(S(q,"validUntil"));
         Require(valid>=issued && (S(q,"eventDate")=="" || Parse(S(q,"eventDate"))>=issued),"Fechas inválidas.");
+        if(q["promotion"]!=null) {
+            var eventDate=Parse(S(q,"eventDate"));
+            Require(N(q,"pricingVersion")==2 && eventDate>=new DateOnly(2026,11,30) && eventDate<=new DateOnly(2027,1,2),"La promoción navideña sólo corresponde a eventos del 30/11/2026 al 02/01/2027.");
+            if(creating){
+                var today=DateOnly.FromDateTime((now??DateTimeOffset.UtcNow).ToOffset(TimeSpan.FromHours(-5)).DateTime);
+                Require(allowPromotion && today>=new DateOnly(2026,11,23) && today<=new DateOnly(2027,1,2),"La cuenta no tiene una promoción navideña vigente.");
+            }
+        }
         if(N(q,"pricingVersion")==2) Require(N(q,"taxPercent")==18 && valid<=issued.AddDays(21) && S(q,"locationMode")!="legacy" && N(q,"deliveryCents")==0,"Revisa vigencia, movilidad e IGV.");
         var province=Ubigeo["provinces"]!.AsArray().FirstOrDefault(x=>S(x!,"id")==S(q,"provinceId"));
         var district=Ubigeo["districts"]!.AsArray().FirstOrDefault(x=>S(x!,"id")==S(q,"districtId"));
         Require((S(q,"provinceId")=="" || province!=null) && (S(q,"districtId")=="" || (district!=null && S(district,"provinceId")==S(q,"provinceId"))) && (S(q,"locationMode")!="on_location" || (province!=null && district!=null)),"Ubicación inválida.");
         if(creating && S(q,"locationMode")=="on_location") Require(S(q,"address").Length>0,"Indica la dirección o referencia para entregar el pedido en locación.");
         if(creating) Require(Regex.IsMatch(S(q,"contact"),@"^(?:\+51 ?)?[0-9]{9}$"),"Ingresa un teléfono de 9 dígitos, sin incluir el código +51.");
+        if(creating) {
+            Require(S(q,"eventDate").Length>0,"La fecha del evento es obligatoria.");
+            Require(N(q,"advancePercent")==50,"El anticipo para nuevas propuestas es 50%.");
+            Require(S(q,"clientType")!="persona_natural" || DocumentType(q)=="dni","Selecciona Persona Natural con DNI o Empresa con RUC.");
+            foreach(var valueItem in q["items"]!.AsArray()) {
+                var item=valueItem!;var portfolio=S(item,"portfolioId");var catalog=S(item,"catalogId");
+                Require(portfolio=="" || catalog=="","Referencia de producto ambigua.");
+                var rate=portfolio!=""?Pricing["portfolio"]![portfolio]:catalog!=""?Pricing["catalog"]![catalog]:null;
+                Require((portfolio=="" && catalog=="") || rate!=null,"Tarifa de producto no configurada.");
+                if(rate!=null) Require(N(item,"priceCents")==rate["prices"]![S(q,"currency")]!.GetValue<long>() && S(item,"unit")==S(rate,"unit"),"El precio y la unidad los define el producto seleccionado.");
+                if(portfolio=="" && catalog=="") Require(N(item,"priceCents")==0 && S(item,"unit")=="servicio","El servicio sin referencia queda pendiente de evaluación, con importe 0 por servicio.");
+                if(portfolio!="") {
+                    var flavors=item["flavors"]?.AsArray().Select(f=>f!.GetValue<string>()).ToArray()??[];
+                    Require(flavors.Length>=1 && flavors.Length<=4 && flavors.Distinct().Count()==flavors.Length && flavors.All(f=>Pricing["flavors"]!.AsArray().Any(v=>v!.GetValue<string>()==f)),"Selecciona entre 1 y 4 sabores distintos de la lista.");
+                    Require(S(item,"presentation").Length>0,"La presentación es obligatoria.");
+                    item["scope"]=S(item,"scope")==""?"Unknown.":S(item,"scope");
+                    var expected=$"Contenido: {string.Join(", ",flavors)}\nPresentación: {S(item,"presentation")}\nAlcance: {S(item,"scope")}";
+                    Require(S(item,"description")==expected,"El detalle no coincide con los datos del servicio.");
+                }
+            }
+        }
         foreach(var material in q["materials"]!.AsArray()) {
             var m=material!;var definition=Ingredients.FirstOrDefault(d=>S(d!,"name")==S(m,"name"));
             var selections=m["configuration"]!["selections"]!.AsObject();
@@ -88,8 +118,9 @@ public static class QuoteDomain
         long packs=0,addons=0;
         foreach(var i in q["items"]!.AsArray()) {var line=N(i!,"priceCents")*N(i!,"quantity");if(S(i!,"category")=="addon")addons+=line;else packs+=line;}
         var subtotal=packs+addons;var rate=N(q,"pricingVersion")==2 && S(q,"locationMode")=="on_location"?5:0;
-        var mobility=N(q,"pricingVersion")==2?Percent(subtotal,rate):N(q,"deliveryCents");
-        var basis=subtotal+mobility;var tax=N(q,"pricingVersion")==2?Percent(basis,18):0;var total=basis+tax;var advance=Percent(total,N(q,"advancePercent"));
-        return new(){{"subtotal",subtotal},{"total",total},{"advance",advance},{"balance",total-advance},{"packs",packs},{"addons",addons},{"mobility",mobility},{"mobilityRate",rate},{"base",basis},{"tax",tax}};
+        var discount=q["promotion"]!=null?Percent(subtotal,N(q["promotion"]!,"percent")):0;var netServices=subtotal-discount;
+        var mobility=N(q,"pricingVersion")==2?Percent(netServices,rate):N(q,"deliveryCents");
+        var basis=netServices+mobility;var tax=N(q,"pricingVersion")==2?Percent(basis,18):0;var total=basis+tax;var advance=Percent(total,N(q,"advancePercent"));
+        return new(){{"subtotal",subtotal},{"total",total},{"advance",advance},{"balance",total-advance},{"packs",packs},{"addons",addons},{"mobility",mobility},{"mobilityRate",rate},{"base",basis},{"tax",tax},{"discount",discount},{"netServices",netServices}};
     }
 }

@@ -2,6 +2,7 @@
 import asyncio
 import json
 import os
+import secrets
 from pathlib import Path
 import statistics
 import subprocess
@@ -19,7 +20,7 @@ async def public_load():
     latencies=[]
     async with httpx.AsyncClient(base_url=ORIGIN,timeout=10,trust_env=False) as client:
         # Warm the SQLite catalog and production routes before measured requests.
-        for route in ('/api/health','/api/catalog','/','/catalogo','/cotizar'):
+        for route in ('/api/health','/api/catalog','/','/catalogo','/auth/login'):
             response=await client.get(route)
             assert response.status_code==200,(route,response.status_code)
             assert response.headers.get('x-content-type-options')=='nosniff'
@@ -30,6 +31,8 @@ async def public_load():
             assert required in policy
             assert response.headers.get('strict-transport-security')=='max-age=63072000'
         assert (await client.get('/api/quotes')).status_code==401
+        quotation=await client.get('/cotizar')
+        assert quotation.status_code==200,quotation.status_code
         async def request(index):
             async with semaphore:
                 started=time.perf_counter()
@@ -49,7 +52,7 @@ async def public_load():
 def main():
     with tempfile.TemporaryDirectory(prefix='sweet-production-smoke-') as temp:
         env={k:v for k,v in os.environ.items() if not k.lower().endswith('_proxy')}
-        env.update(NODE_ENV='production',NEXT_TELEMETRY_DISABLED='1',APP_ORIGIN='https://localhost:3391',API_BACKEND='next',DATABASE_PATH=str(Path(temp)/'smoke.sqlite'))
+        env.update(NODE_ENV='production',NEXT_TELEMETRY_DISABLED='1',APP_ORIGIN='https://localhost:3391',API_BACKEND='next',DATABASE_PATH=str(Path(temp)/'smoke.sqlite'),SESSION_SECRET=secrets.token_hex(32),ACCOUNT_AUTH_ENABLED='true',ACCOUNT_JWT_SECRET=secrets.token_hex(32),ACCOUNT_ISSUER='https://localhost:3391/accounts',OIDC_EXTERNAL_LOGIN_ENABLED='false')
         with (Path(temp)/'next.log').open('w',encoding='utf-8') as log:
             proc=OwnedProcess([os.environ.get('NODE_EXEC','node'),'node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3390'],cwd=ROOT/'web',env=env,stdout=log,stderr=log)
             try:
@@ -60,7 +63,7 @@ def main():
                     except httpx.HTTPError:pass
                     time.sleep(.25)
                 else:raise TimeoutError('Production server did not become ready')
-                report={'status':'passed','scope':'Local production build; public routes only. Authenticated writes and real OIDC/RUC are covered separately or pending external setup.','smoke_routes':5,'result':asyncio.run(public_load())}
+                report={'status':'passed','scope':'Local production build; public routes and guest quotation access, private account history, and optional synthetic registration/PDF browser flow. Real OIDC/RUC and external email require separate setup.','smoke_routes':5,'public_quote_access':'passed','anonymous_account_history':401,'result':asyncio.run(public_load())}
                 if os.environ.get('RUN_BROWSER_E2E')=='1':
                     with local_https_proxy(Path(temp),ORIGIN,3391) as origin:
                         subprocess.run([env.get('NODE_EXEC','node'),str(ROOT/'tests/production_browser.mjs')],

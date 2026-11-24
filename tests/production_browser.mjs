@@ -4,6 +4,7 @@ import {createRequire} from 'node:module';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {resolve, dirname} from 'node:path';
+import {randomBytes,randomUUID} from 'node:crypto';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const require=createRequire(resolve(root,'web/package.json'));
@@ -30,7 +31,31 @@ try{
  checked('HTTPS response carries two-year HSTS',response.headers()['strict-transport-security']==='max-age=63072000');
  await page.getByRole('img',{name:'E&A Cotiza',exact:true}).first().waitFor();
  checked('Official brand renders in the production bundle');
- const staticContext=await browser.newContext({viewport:{width:390,height:844},ignoreHTTPSErrors:true,javaScriptEnabled:false});
+ await page.goto(process.env.E2E_ORIGIN+'/cotizar');
+ await page.locator('#client-document').waitFor({state:'visible'});
+ await page.waitForFunction(name=>document.querySelector('#client-name')?.value===name,quote.client);
+ checked('Production quotation page is available without registration',new URL(page.url()).pathname==='/cotizar');
+ const offerState=await page.waitForFunction(()=>document.querySelector('.christmas-offer')?'offer':localStorage.getItem('ea-choice-navidad-2026')?'guest':null);
+ const currentDay=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ const campaignOpen=currentDay>='2026-11-23'&&currentDay<='2027-01-02';
+ checked('The Christmas invitation follows the campaign window',(await offerState.jsonValue())===(campaignOpen?'offer':'guest'));
+ if(campaignOpen){
+  const offer=page.getByRole('dialog').filter({has:page.locator('.christmas-offer-title')});
+  await offer.getByRole('button',{name:'Continuar sin registro',exact:true}).click();
+  await offer.waitFor({state:'hidden'});
+ }
+ await page.locator('.guest-quote-notice').waitFor({state:'visible'});
+ checked('The visitor can continue as guest without entering credentials',new URL(page.url()).pathname==='/cotizar'&&await page.getByRole('tab',{name:'Presupuestos guardados',exact:true}).count()===0);
+ checked('Guest access does not expose account history',(await context.request.get(process.env.E2E_ORIGIN+'/api/quotes')).status()===401);
+ // The account and database belong only to this ephemeral smoke process.
+ const username='qa-production-'+randomUUID().slice(0,12),password=randomBytes(24).toString('base64url');
+ const registered=await context.request.post(process.env.E2E_ORIGIN+'/api/auth/register',{headers:{Origin:process.env.E2E_ORIGIN},data:{username,password,confirmation:password,displayName:'Cliente sintético de producción'}});
+ assert.equal(registered.status(),201,'Synthetic customer registration');
+ assert.equal((await registered.json()).signedIn,true,'Registration establishes its own account session');
+ await page.reload();
+ await page.getByRole('tab',{name:'Presupuestos guardados',exact:true}).waitFor({state:'visible'});
+ checked('Synthetic registration establishes a customer session without another login form');
+ const staticContext=await browser.newContext({viewport:{width:390,height:844},ignoreHTTPSErrors:true,javaScriptEnabled:false,storageState:await context.storageState()});
  try{
   const staticPage=await staticContext.newPage();
   await staticPage.goto(process.env.E2E_ORIGIN+'/cotizar');
@@ -49,11 +74,15 @@ try{
  await page.screenshot({path:resolve(artifacts,'pdf-preview.png')});
  await page.keyboard.press('Escape');
  const downloading=page.waitForEvent('download');
- await page.getByRole('button',{name:'Descargar cotización PDF',exact:true}).click();
+ await page.getByRole('button',{name:'Guardar y descargar PDF',exact:true}).click();
  const download=await downloading;
  const pdf=resolve(artifacts,'cotizacion-qa.pdf');
  await download.saveAs(pdf);
  checked('Production browser downloads a valid PDF',readFileSync(pdf).subarray(0,5).toString()==='%PDF-');
+ const history=await context.request.get(process.env.E2E_ORIGIN+'/api/quotes');
+ assert.equal(history.status(),200);
+ const entries=await history.json();
+ checked('Downloaded quotation is also stored in customer history',Array.isArray(entries.quotes)&&entries.quotes.some(entry=>entry.quote?.client===quote.client));
  await page.screenshot({path:resolve(artifacts,'desktop.png'),fullPage:true});
  await page.setViewportSize({width:390,height:844});
  checked('Production mobile layout fits the viewport',await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));

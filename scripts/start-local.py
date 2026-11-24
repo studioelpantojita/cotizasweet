@@ -28,6 +28,14 @@ if private.exists():
 env.update(APP_ENV='development',NODE_ENV='development',ASPNETCORE_ENVIRONMENT='Development',OIDC_ISSUER=urls['identity'],OIDC_AUDIENCE='ea-cotiza-api',OIDC_CLIENT_ID='ea-cotiza-local',OIDC_CLIENT_SECRET=secrets.token_urlsafe(40),SESSION_SECRET=secrets.token_hex(32),OIDC_ALLOW_LOCAL_HTTP='true',APP_ORIGIN=urls['web'],API_BACKEND='dotnet',API_BASE_URL=urls['api'],RUC_SERVICE_URL=urls['ruc'],INTEGRATION_SERVICE_KEY=secrets.token_urlsafe(48),NEXT_TELEMETRY_DISABLED='1',PYTHONUTF8='1',LOCAL_WEB_PORT=str(ports['web']),LOCAL_IDENTITY_PORT=str(ports['identity']))
 env['PYTHONPATH'] = settings.get('pythonModules','')
 env['OIDC_PROVIDER'] = 'standard'
+account_settings = ROOT/'.local/accounts-settings.json'
+if not account_settings.exists():
+    raise RuntimeError('Prepara las cuentas de revisión con web/scripts/provision-accounts.ts antes de iniciar la plataforma.')
+account_configuration = json.loads(account_settings.read_text(encoding='utf-8-sig'))
+account_secret = account_configuration.get('jwtSecret','')
+if len(account_secret)!=64 or any(c not in '0123456789abcdefABCDEF' for c in account_secret):
+    raise RuntimeError('La configuración privada de cuentas no es válida.')
+env.update(ACCOUNT_AUTH_ENABLED='true',ACCOUNT_JWT_SECRET=account_secret,ACCOUNT_ISSUER=urls['web']+'/accounts',OIDC_EXTERNAL_LOGIN_ENABLED='false')
 # Each local web port has independent build files, so parallel previews do not lock each other.
 env['NEXT_DIST_DIR'] = f".next-local-{ports['web']}"
 env['PATH'] = str(Path(settings['node']).parent)+os.pathsep+env.get('PATH','')
@@ -39,6 +47,12 @@ def start(name,command,cwd,extra=None):
     output = open(logs/(name+'.log'),'w',encoding='utf-8'); files.append(output)
     service_env={**env,**(extra or {})}
     if name!='python-ruc': service_env.pop('RUC_API_TOKEN',None)
+    if name not in ('next-typescript','dotnet-api'):
+        for key in ('ACCOUNT_AUTH_ENABLED','ACCOUNT_JWT_SECRET','ACCOUNT_ISSUER'):
+            service_env.pop(key,None)
+    if name!='next-typescript': service_env.pop('SESSION_SECRET',None)
+    if name not in ('next-typescript','identidad-local'): service_env.pop('OIDC_CLIENT_SECRET',None)
+    if name=='identidad-local': service_env.pop('INTEGRATION_SERVICE_KEY',None)
     proc = subprocess.Popen(command,cwd=cwd,env=service_env,stdout=output,stderr=output)
     processes.append((name,proc)); print('Iniciando '+name+'…',flush=True); return proc
 def ready(url,proc):
@@ -64,7 +78,7 @@ try:
     ready(urls['api']+'/health',api)
     web = start('next-typescript',[settings['node'],'node_modules/next/dist/bin/next','dev','--webpack','--hostname','127.0.0.1','--port',str(ports['web'])],ROOT/'web',{'DATABASE_PATH':str(data/'sessions.sqlite')})
     ready(urls['web']+'/cotizar',web)
-    print('\nAplicación: '+urls['web']+'/cotizar\nTypeScript / Next.js → .NET → Python → proveedor RUC\nIdentidad de desarrollo local. Detén la depuración para cerrar los servicios.',flush=True)
+    print('\nAplicación: '+urls['web']+'/cotizar\nTypeScript / Next.js → .NET → Python → proveedor RUC\nCotiza como invitado o accede con User y Password. Consulta .local/ACCESOS-REVISION.html. Detén la depuración para cerrar los servicios.',flush=True)
     if not args.no_browser: webbrowser.open(urls['web']+'/cotizar')
     while all(p.poll() is None for _,p in processes): time.sleep(1)
     raise RuntimeError('Un servicio se detuvo. Revisa logs y reinicia la aplicación.')

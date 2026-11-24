@@ -61,6 +61,16 @@
 .portfolio-selected h3{font-family:var(--eacotiza-font);font-size:27px;font-weight:400;margin:8px 0}
 .portfolio-selected p,.portfolio-selected small{font-size:12px;line-height:1.7;color:#73665f}
 .portfolio-details{display:grid;gap:14px;margin-bottom:18px}
+.portfolio-flavors{min-width:0;border:0;padding:0;margin:0 0 20px}
+.portfolio-flavors legend{font-size:13px;font-weight:600;color:#3c3134;margin-bottom:8px}
+.portfolio-flavors>.field-help{font-size:12px;color:#776c67;margin:0 0 12px}
+.flavor-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.flavor-options label{display:flex;align-items:center;gap:9px;min-height:44px;padding:9px 11px;border:1px solid #dfd3d4;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;line-height:1.4;color:#4b333c}
+.flavor-options label:has(:checked){border-color:#7a3854;background:#f5eaf0}
+.flavor-options label:has(:disabled){opacity:.6;cursor:default}
+.flavor-options input[type="checkbox"]{width:18px!important;height:18px!important;min-height:18px!important;margin:0;flex:0 0 18px;accent-color:#6e3248}
+.flavor-options input:focus-visible{outline:2px solid #873e59;outline-offset:4px}
+.service-card .field input[readonly],.portfolio-dialog .field input[readonly]{background:#f7f3ed;color:#584547}
 .portfolio-configure>.service-card-numbers{margin:12px 0 20px}
 .portfolio-dialog .service-card-numbers>.field{display:grid;grid-template-rows:36px 48px auto}
 .portfolio-confirm{display:flex;justify-content:space-between;align-items:center;gap:20px;border-top:1px solid #ded4c8;padding-top:22px;margin-top:20px}
@@ -77,6 +87,7 @@
 .materials-disclosure-body{padding-top:22px}
 .pickup-address{background:#f7f3ec!important;color:#4b3d3e;font-weight:500}
 @media(max-width:700px){
+ .flavor-options{grid-template-columns:repeat(2,minmax(0,1fr))}
  .portfolio-dialog[data-slot="dialog-content"]{padding:22px 18px;width:calc(100vw - 20px);max-height:94dvh}
  .portfolio-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
  .portfolio-product>span{font-size:17px;padding:12px 10px 6px}

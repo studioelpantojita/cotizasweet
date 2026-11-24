@@ -1,67 +1,82 @@
 # Revisión manual local de E&A Cotiza 2.3.0
 
-Esta guía corresponde exclusivamente a `outputs/CotizaSweet_v2.3.0`. Permite revisar las observaciones de interfaz del 21 de noviembre de 2026, navegar por los cuatro pasos del cotizador y registrar resultados antes de aprobar la publicación en GitHub.
+Guía actualizada el **23 de noviembre de 2026** para `outputs/CotizaSweet_v2.3.0`. Las observaciones nuevas se aplican sobre esta misma versión, sin crear otra versión por cada cambio. La copia 2.2.1 y sus datos se conservan como referencia independiente. No se migran automáticamente sus cotizaciones. La publicación en GitHub requiere la aprobación expresa del propietario.
 
-La copia 2.2.1 conserva su carpeta y sus datos. La revisión 2.3.0 tiene nuevas bases y archivos de ejecución propios. Sus cotizaciones anteriores no se migraron automáticamente. Usa datos ficticios durante la revisión.
+Usa datos ficticios durante la revisión. Los precios iniciales están autorizados únicamente como referencias para pruebas; no constituyen una tarifa comercial confirmada. El acta de esta actualización y sus evidencias se reúnen en [NUEVAS-OBSERVACIONES-2026-11-22.md](NUEVAS-OBSERVACIONES-2026-11-22.md).
 
-## Acceso a la plataforma
+## Acceder con una cuenta
 
-Abre [Inicio](http://127.0.0.1:3370) o [el cotizador](http://127.0.0.1:3370/cotizar) cuando su lanzador esté en ejecución. La aplicación permanece disponible mientras ese proceso esté activo. Una dirección local que no responda requiere iniciar la copia correspondiente antes de continuar.
+Abre [Inicio](http://127.0.0.1:3370) o [Accede](http://127.0.0.1:3370/auth/login) cuando el lanzador esté activo. El cotizador permite continuar sin registro. El anuncio navideño ofrece crear una cuenta con beneficio para eventos del 30/11/2026 al 02/01/2027 o continuar como invitado. User y Password sólo son obligatorios al acceder a una cuenta. Consulta [NAVIDAD-INVITADOS-2026-11-23.md](NAVIDAD-INVITADOS-2026-11-23.md) para probar ambos recorridos.
+
+Los accesos de revisión de esta instalación están en el documento privado [ACCESOS-REVISION.html](../.local/ACCESOS-REVISION.html). Ábrelo localmente y utiliza el perfil correspondiente. No compartas su contenido ni lo incluyas en GitHub o en el paquete de fuentes. Las contraseñas pertenecen a E&A Cotiza; utiliza contraseñas diferentes a las de Gmail u otros servicios.
+
+- **Cliente:** abre el cotizador, conserva su propio historial y puede enviar solicitudes al negocio.
+- **Administrador:** abre [Administración](http://127.0.0.1:3370/admin), consulta las solicitudes enviadas y sus PDF, y crea cuentas de cliente. Una cuenta de cliente no obtiene este permiso cambiando un dato del formulario.
+- **Cuenta propia:** usa **Crear mi cuenta** en el acceso. El registro público crea una cuenta de cliente. El rol de administrador se prepara mediante la herramienta privada del propietario.
+- **Contraseña y salida:** desde **Mi cuenta**, en [cuenta](http://127.0.0.1:3370/cuenta), puedes cambiar tu contraseña. Usa **Cerrar sesión** al terminar. Un cambio de contraseña invalida las sesiones anteriores y exige un acceso nuevo.
+
+La sesión puede requerir un acceso nuevo al reiniciar el lanzador; las cuentas y las cotizaciones guardadas se conservan en las bases de esta copia. Google real mantiene su configuración y aceptación separadas; este formulario no solicita la contraseña de Google.
 
 | Componente de esta copia | Dirección |
 |---|---|
 | Web | `http://127.0.0.1:3370` |
 | API de cotizaciones .NET | `http://127.0.0.1:8370` |
 | Servicio RUC Python | `http://127.0.0.1:8371` |
-| Emisor de identidad de desarrollo | `http://127.0.0.1:9370` |
+| Emisor sintético de compatibilidad de las pruebas OIDC | `http://127.0.0.1:9370` |
 
-Estos puertos se guardan en el archivo privado `local.settings.json`. Conserva la dirección con `127.0.0.1` para mantener el mismo origen del borrador. La ficha [ACCESO_LOCAL_PRIVADO.html](../.local/ACCESO_LOCAL_PRIVADO.html), si está incluida en la copia preparada, reúne el acceso de este equipo. La configuración privada y las bases no forman parte del ZIP de fuentes ni del repositorio.
-
-Pulsa **Accede** en la cabecera para entrar. El emisor local completa el acceso con **Desarrollo local**, correo **local@example.test**, sin pedir contraseña ni enviar correo. En el cotizador, **Cerrar sesión** indica que el acceso está activo. Esta identidad sintética sirve para la revisión local; la aceptación con una cuenta real de Google conserva su configuración y prueba pendientes según [GOOGLE.md](GOOGLE.md).
-
-Si se reinicia el lanzador, puede ser necesario volver a entrar porque se renuevan las claves de sesión. Las cotizaciones guardadas permanecen en las bases de esta copia.
+Estos puertos pertenecen a la configuración privada `local.settings.json`. Conserva `127.0.0.1` para mantener el mismo origen de la sesión y del borrador. La identidad sintética del puerto 9370 no sustituye el formulario de User y Password. Las bases, los accesos y la configuración privada se excluyen del repositorio y del ZIP de fuentes.
 
 ## Abrir y ejecutar desde Visual Studio
 
-Abre [INICIAR-EN-VISUAL-STUDIO.slnx](../INICIAR-EN-VISUAL-STUDIO.slnx), situado en la raíz de `CotizaSweet_v2.3.0`, y selecciona **EA.Cotiza.Local** como proyecto de inicio. Puedes navegar por el código sin iniciar otra instancia.
+Abre [INICIAR-EN-VISUAL-STUDIO.slnx](../INICIAR-EN-VISUAL-STUDIO.slnx), en la raíz de esta copia, y selecciona **EA.Cotiza.Local** como proyecto de inicio. Puedes navegar por el código sin iniciar otra instancia.
 
-Antes de F5, detén la instancia que ya esté utilizando los puertos de esta revisión. Si la iniciaste desde una terminal, usa Ctrl+C; si la iniciaste desde Visual Studio, usa Mayús+F5. Si la entrega incluye un control privado `.local/DETENER-REVISION.ps1`, úsalo únicamente para el lanzador preparado al que corresponde. Evita cerrar en conjunto los procesos de Node, Python o .NET del equipo.
+Antes de F5, detén la instancia que ya utilice los puertos de esta revisión. Si la iniciaste desde una terminal, usa Ctrl+C; si la iniciaste desde Visual Studio, usa Mayús+F5. Si existe `.local/DETENER-REVISION.ps1`, úsalo únicamente para el lanzador preparado al que corresponde. Evita cerrar en conjunto los procesos de Node, Python o .NET del equipo.
 
-Pulsa F5 y espera a que el lanzador indique el puerto 3370. La solución compila el lanzador y la API .NET. Ante un error de compilación, revisa la salida y recompila antes de ejecutar; utilizar la última compilación correcta puede abrir código anterior al que estás revisando. Al terminar las pruebas de una sesión iniciada con F5, usa Mayús+F5.
+Pulsa F5 y espera el inicio del puerto 3370. La solución compila el lanzador y la API .NET. Ante errores de compilación o un archivo bloqueado por .NET Host, detén la instancia correspondiente y recompila antes de ejecutar. Ejecutar la última compilación correcta puede abrir código anterior al que deseas revisar.
 
-Una extracción nueva del ZIP requiere los runtimes y la preparación indicados en README. Desde la raíz de la extracción, el comando siguiente asigna los puertos de esta revisión.
+Una extracción nueva del ZIP requiere los runtimes y la preparación descritos en [README](../README.md). Desde la raíz de la extracción:
 
 ```powershell
 .\scripts\setup-local.ps1 -NodePath node -PythonPath python -DotnetPath dotnet -WebPort 3370 -ApiPort 8370 -RucPort 8371 -IdentityPort 9370
+Push-Location web
+node scripts/run-ts.cjs scripts/provision-accounts.ts
+Pop-Location
 ```
+
+La preparación de cuentas genera el documento privado de accesos de esa instalación. No copies contraseñas, claves de firma ni bases de otra copia para reconstruirla. Después puedes abrir la solución e iniciar F5.
 
 ## Datos ficticios recomendados
 
 | Campo | Valor de prueba |
 |---|---|
-| Tipo de cliente inicial | Persona Natural |
+| Tipo de cliente | Persona Natural |
 | DNI | `12345678` |
 | Nombre | `Cliente de prueba manual` |
 | Contacto del negocio | `900000000`, sin escribir el prefijo `+51` |
 | Correo opcional | `cliente@example.test` |
 | Objetivo del Proyecto | Cumpleaños |
 | Detalle del Proyecto | `Celebración para 30 invitados. Mesa dulce en tonos marfil y borgoña, con cajas de regalo personalizadas.` |
+| Fecha del evento | Una fecha posterior o igual a la fecha de emisión |
 | RUC de demostración para Empresa | `20999999990` |
 
-El RUC de demostración debe devolver **PASTELERÍA DE DEMOSTRACIÓN S.A.C.**, estado **DEMO** y la indicación de que no se consultó SUNAT. No acredita un proveedor real ni genera una consulta facturable. Los datos comerciales de **Dulce Atelier**, incluidos contactos, dirección, precios e imágenes, siguen siendo referenciales. **E&A Cotiza** identifica la plataforma.
+El RUC de demostración debe identificar expresamente los datos ficticios y que no se consultó SUNAT. No acredita una empresa real ni genera una consulta facturable. **E&A Cotiza** identifica la plataforma. Los datos de **Dulce Atelier**, las presentaciones y los precios de muestra necesitan confirmación comercial del negocio.
 
 ## Recorrer los cuatro pasos
 
-La barra lateral permite elegir cualquier paso. **Continuar** y **Anterior** cambian el panel sin descartar la propuesta. El estado del borrador y el paso se conservan en esta pestaña; **Guardar borrador** guarda ese estado local. Para conservar una versión en el historial del servidor, utiliza **Guardar** con sesión iniciada en el último paso. Cerrar la pestaña puede eliminar su borrador local.
+La barra lateral permite elegir cualquier paso. **Continuar** y **Anterior** conservan la propuesta. **Guardar borrador** conserva el estado en esta pestaña; no crea una cotización en el servidor. Cerrar la pestaña puede eliminar ese borrador. El último paso **Guardar y descargar PDF** guarda una copia en el historial de tu cuenta y descarga su documento.
 
-| Paso | Campos y funciones que debes encontrar |
+| Paso | Contenido actual |
 |---|---|
-| 1 · Proyecto y cliente | Objetivo del Proyecto, presupuesto máximo, Detalle del Proyecto, tipo de cliente, DNI/RUC, nombre o razón social, consulta RUC y reintento, contacto del negocio con prefijo Perú, correo opcional y fecha opcional del evento. Si reabres un registro que tenía contacto del cliente, también debe conservar ese campo |
-| 2 · Servicios e insumos | Paquetes Esencial, Signature y Alta Vitrina, sugerencia y presupuesto; moneda; cartera y personalización; packs y adicionales; servicio sin referencia; nombre, categoría, contenido y alcance, unidad, cantidad, precio y eliminación de cada servicio; ficha opcional de insumos con sus opciones, cacao y especificaciones; notas generadas y notas históricas cuando existan |
-| 3 · Entrega y condiciones | Recojo o locación, provincia, distrito, dirección o referencia y movilidad; fecha de emisión, validez, IGV, anticipo; condiciones de alcance, entrega, revisiones y pago |
-| 4 · Revisar propuesta | Propuesta completa y sus importes, detalle del proyecto, insumos y condiciones; Ver PDF, Descargar cotización PDF, Guardar y Compartir PDF |
+| 1 · Proyecto y cliente | Objetivo del Proyecto, presupuesto máximo opcional, Detalle del Proyecto, Tipo de Cliente con únicamente Persona Natural o Empresa, DNI o RUC, nombre o razón social, contacto del negocio, correo opcional y fecha del evento obligatoria. **Elige el paquete para tu evento.** aparece aquí y su selección es opcional |
+| 2 · Servicios e insumos | Únicamente las secciones **Servicios de la propuesta** y **Ficha de insumos**, esta última opcional. Dentro de los servicios están la moneda, la cartera, sus seis accesos representativos, las líneas de la propuesta y el servicio sin referencia |
+| 3 · Entrega y condiciones | Locación y movilidad; vigencia e impuestos; condiciones y notas. Recojo o locación con sus datos, movilidad calculada, emisión y validez en una fila de escritorio, IGV informado y anticipo del 50% sin control editable |
+| 4 · Revisar propuesta | Vista de la propuesta y sus importes, Ver PDF, **Guardar y descargar PDF**, y después **Enviar Cotización** a la bandeja del administrador |
 
-El antiguo control **Proyecto** ya no debe aparecer en **Tu negocio y tu cliente**. Su reemplazo visible es **Detalle del Proyecto** en el primer paso. La validación al guardar o exportar identifica los campos pendientes y abre el paso que los contiene.
+Los cuatro grupos del objetivo son **Celebraciones privadas**, **Regalos corporativos**, **Selección a medida** y **Experiencias de marca**. Los paquetes sugeridos cambian según el objetivo elegido. Abrir **Sugerido para revisar** o **Revisar contenido** muestra un diálogo; solo **Elegir este paquete** carga sus servicios y condiciones, reemplazando los actuales. Puedes cerrar el diálogo y continuar sin seleccionar un paquete.
+
+Para personalizar una pieza de la cartera, selecciona de uno a cuatro sabores entre **vainilla, chocolate, café, frambuesa, lucuma, naranjo, cherry, crema pastelera, pistacho y almendras**. La presentación es obligatoria. El alcance es opcional: vacío se registra como **Unknown.** La cantidad la introduces tú; la unidad y el precio unitario provienen de la tarifa referencial del producto y no son editables por el cliente. La tarifa declara importes separados para PEN y USD, sin conversión automática.
+
+Un **servicio sin referencia** queda con precio **0** y unidad **servicio**, pendiente de evaluación del negocio. No representa gratuidad confirmada; la propuesta informa que su total es provisional. No debes introducir una tarifa arbitraria en ese caso.
 
 ## Criterios de aceptación
 
@@ -69,22 +84,34 @@ Marca cada criterio como **Conforme**, **Observación** o **Pendiente**. Conserv
 
 | N.º | Recorrido | Resultado esperado |
 |---|---|---|
-| 1 | Abre `/catalogo?seleccion=packs`, enfoca el buscador con ratón y con Tab, escribe una palabra y pulsa Limpiar | Se muestra un único indicador claro de foco. El icono y el texto quedan alineados; no aparecen los dos marcos superpuestos de la captura original. El filtro devuelve resultados o un estado vacío coherente y Limpiar restaura la lista |
-| 2 | Recorre Inicio y pulsa la fotografía principal, una tarjeta de la selección, una fotografía de ocasión, la imagen de Cómo Funciona y la de Packs y cajas | Cada fotografía abre su ficha emergente con imagen y descripción sin cambiar la URL. El control Cerrar y Escape permiten volver. El foco regresa al elemento inicial. Solo una acción independiente de la ficha puede llevarte al cotizador |
-| 3 | Revisa la cabecera en Inicio, Catálogo y Cotizar. Usa Catálogo, Cómo Funciona y Accede. Repite con una ventana de unos 390 px | La marca queda a la izquierda y los tres accesos a la derecha en escritorio. En móvil se abren desde el menú. Cómo Funciona lleva a su sección de inicio, Catálogo abre la selección y Accede completa el acceso local sin contraseña |
-| 4 | Recorre Inicio antes de abrir fichas | No se repite Explorar presentación en cada imagen. Los accesos visibles al cotizador se concentran en la ocasión seleccionada y el pie. El hero invita a descubrir el catálogo y elegir ocasión |
-| 5 | En Proyecto y cliente completa los datos de prueba, escribe dos líneas en Detalle del Proyecto y avanza. Vuelve con Anterior o la barra lateral y pulsa Guardar borrador | Los valores se conservan. Objetivo del Proyecto y Detalle del Proyecto usan los nombres acordados. No existe otro campo Proyecto en Tu negocio y tu cliente. Al recargar esta misma pestaña se recuperan el borrador válido y el paso |
-| 6 | En Servicios e insumos añade un servicio sin referencia llamado Servicio de prueba, unidad servicio, cantidad 2 y precio 50.00 PEN. Cambia sus campos, añade y retira un adicional. Revisa los paquetes sin seleccionarlos si deseas mantener ese servicio | Todos los controles de servicios siguen disponibles. Seleccionar un paquete reemplaza la selección y sus condiciones de forma explícita; cambiar solo el objetivo actualiza sus sugerencias. El servicio de prueba termina con subtotal S/ 100.00 |
-| 7 | Despliega Ficha de insumos, elige una categoría y opciones y revisa sus notas automáticas. Cambia entre pasos y vuelve | Las opciones y las notas se conservan. La ficha sigue siendo opcional y las elecciones no se presentan como certificaciones orgánicas o garantías de ausencia de alérgenos |
-| 8 | En Entrega y condiciones usa recojo y anticipo del 50% con el servicio de prueba. Después cambia a locación con provincia, distrito y dirección ficticia. Prueba también USD | En recojo, IGV S/ 18.00, total S/ 118.00, anticipo y saldo S/ 59.00. En locación, movilidad 5.00, base 105.00, IGV 18.90, total 123.90 y anticipo y saldo 61.95. USD cambia la moneda declarada sin convertir importes |
-| 9 | En Revisar propuesta pulsa Ver PDF y Descargar cotización PDF. Usa un detalle largo y varias líneas, hasta el límite del control. Comprueba todas sus páginas | El contenido completo de Detalle del Proyecto aparece una sola vez como descripción del proyecto, con Objetivo del Proyecto actualizado. No se usa un título independiente que sustituya ese contenido. Se conservan firma vectorial, cliente, fecha, moneda, servicios, importes, insumos y condiciones, sin textos cortados ni solapamientos |
-| 10 | Con sesión iniciada guarda, abre Presupuestos guardados, actualiza y reabre la propuesta. Descarga su PDF desde la fila. Si tienes más de 20, usa Cargar más propuestas | Se conservan detalle, cliente, moneda, importes y selección. El historial está aislado por cuenta y no duplica filas. Un registro antiguo sin detalle conserva su título como contenido inicial al reabrirlo |
-| 11 | Vuelve al primer paso, cambia a Empresa e introduce el RUC demo. Revisa la razón social, su estado y el PDF | La interfaz y el documento identifican expresamente los datos ficticios y la ausencia de consulta real de SUNAT. Reabrir una cotización conserva su identificación guardada antes de una consulta nueva |
-| 12 | Deja un campo requerido vacío o un número inválido y, desde el último paso, intenta guardar o exportar. Usa los enlaces del resumen de errores. Repite con Tab, ventana estrecha y cierre de sesión | Se abre el paso correspondiente y el foco llega al control que requiere corrección. Los pasos ocultos no participan en el recorrido con Tab. No existe desplazamiento horizontal de la página. Tras cerrar sesión el historial vuelve a exigir acceso |
+| 1 | Abre el cotizador sin sesión y elige Continuar sin registro; prueba también Accede con campos vacíos y con las credenciales privadas | El invitado puede cotizar, descargar y enviar. Para consultar el historial de una cuenta se exigen User y Password. Un error no concede acceso ni muestra secretos |
+| 2 | Entra con cliente e intenta abrir `/admin`; después entra en otro contexto de navegador con administrador | El cliente vuelve a su cotizador y no obtiene cuentas ni documentos ajenos. El administrador ve su bandeja y la lista de cuentas |
+| 3 | Registra una cuenta propia, entra y abre Mi cuenta | La cuenta tiene rol de cliente. Puedes cambiar su contraseña y volver a entrar con la nueva; la contraseña anterior deja de funcionar |
+| 4 | En el primer paso abre Tipo de Cliente | Solo aparecen Persona Natural y Empresa. Una propuesta nueva solicita DNI para persona natural y RUC para empresa |
+| 5 | Deja vacía la fecha del evento e intenta guardar desde el último paso | La validación abre el primer paso e identifica el campo obligatorio. Con una fecha válida puedes continuar |
+| 6 | Escribe varias líneas en Detalle del Proyecto y llega a su límite de 600 | El contador aparece debajo, alineado a la izquierda. El contenido se conserva al navegar y aparece íntegro una sola vez en el PDF |
+| 7 | Cambia el objetivo entre las cuatro colecciones y revisa los paquetes | El apartado se mantiene en el primer paso y muestra sugerencias de la colección elegida. Cambiar el objetivo conserva los servicios ya añadidos, sin cargar otro paquete automáticamente |
+| 8 | Pulsa Sugerido para revisar y cierra con Escape | El diálogo muestra productos, cantidades, presentaciones e insumos de referencia. Cerrar no cambia la propuesta y devuelve el foco al botón |
+| 9 | Abre el diálogo y pulsa Elegir este paquete; vuelve a revisar otro sin confirmarlo | La selección confirmada carga sus líneas y condiciones. Revisar el otro no las reemplaza. También puedes continuar con selección a medida conservando los servicios |
+| 10 | Continúa al segundo paso sin seleccionar un paquete | El paquete no es obligatorio. Solo aparecen Servicios de la propuesta y Ficha de insumos como secciones principales |
+| 11 | Abre una de las seis categorías de cartera y elige una pieza | El diálogo permite personalizar el producto. Puedes seleccionar hasta cuatro sabores; el quinto queda impedido mientras los cuatro sigan marcados |
+| 12 | Intenta añadir la pieza sin presentación, luego complétala dejando alcance vacío | La presentación es obligatoria. El servicio añadido conserva sus sabores, cantidad y presentación; el alcance aparece como Unknown. |
+| 13 | Revisa precio, unidad y cantidad; cambia de moneda | Precio y unidad no se pueden editar por el cliente; la cantidad sí. La tarifa de cada moneda se aplica sin conversión. Los precios se identifican como referenciales para pruebas |
+| 14 | Añade un servicio sin referencia | Su precio queda en 0 y su unidad en servicio; la interfaz y el documento indican que falta evaluar ese precio. El total provisional no se presenta como tarifa definitiva |
+| 15 | Despliega Ficha de insumos, elige categorías y opciones, cambia de paso y vuelve | Las elecciones y notas automáticas se conservan. La ficha es opcional y no promete certificación orgánica ni ausencia de alérgenos |
+| 16 | En Entrega y condiciones alterna recojo y locación, completando datos ficticios | Recojo no añade movilidad; locación añade 5% antes del IGV. El total incluye IGV del 18%. Las fechas comparten fila en escritorio y el anticipo es 50% sin control editable |
+| 17 | En el último paso pulsa Ver PDF, revisa todas las páginas y luego Guardar y descargar PDF | El PDF se lee sin solapamientos, conserva proyecto, fecha del evento, cliente, sabores, alcance, importes e insumos. El guardado crea una copia en el historial de esa cuenta y descarga el documento |
+| 18 | Tras guardar pulsa Enviar Cotización; repite el envío de esa misma copia | La copia llega a la bandeja del administrador y el recibo confirma la recepción en plataforma. Repetir el envío no duplica la solicitud. El correo se identifica como pendiente de configuración |
+| 19 | Con administrador abre la solicitud y descarga su PDF | La cuenta administradora obtiene la misma copia archivada. Con otra cuenta de cliente no se puede recuperar ese documento ni su solicitud |
+| 20 | Después de guardar cambia un dato de la propuesta | Se requiere guardar y descargar la copia actualizada antes de enviarla. El documento ya enviado conserva sus datos originales |
+| 21 | Abre Presupuestos guardados, actualiza, reabre una cotización y descarga desde su fila; con más de 20 usa Cargar más propuestas | El historial está aislado por cuenta, conserva los datos de cada guardado y pagina sin duplicar filas. Los registros anteriores compatibles se pueden revisar sin reescribir su contenido |
+| 22 | Revisa teclado, foco, mensajes de error, ventana de unos 390 px y cierre de sesión | Los errores llevan al campo correspondiente. Los pasos ocultos no participan con Tab. La página y los diálogos no desbordan horizontalmente. Tras salir se vuelve a exigir acceso |
+| 23 | Abre `/catalogo?seleccion=packs`, busca y limpia; pulsa fotografías del inicio y recorre su cabecera | Se conserva el buscador con un indicador claro de foco, los diálogos de fotografías sin redirección y la navegación Catálogo / Cómo Funciona / Accede o Mi cuenta |
+| 24 | Cambia a Empresa e introduce el RUC de demostración | La interfaz y el PDF identifican los datos ficticios y la ausencia de consulta real de SUNAT. No se confunde esa prueba con una integración externa validada |
 
 ## Registrar observaciones
 
-Anota versión, carpeta, fecha, URL, navegador y tamaño aproximado de la ventana. Para cada incidencia indica el número del criterio y utiliza el siguiente formato.
+Anota **versión 2.3.0**, carpeta, fecha, URL, navegador y tamaño aproximado de ventana. Para cada incidencia usa este formato:
 
 ```text
 Estado: Conforme / Observación / Pendiente
@@ -98,4 +125,4 @@ Captura o PDF de evidencia
 Impacto en el uso
 ```
 
-Indica también los recorridos conformes y los que no ejecutaste. Oculta datos personales reales y valores privados antes de compartir evidencias. Google y Decolecta reales, HTTPS público, controles de Railway y recuperación externa conservan sus propias pruebas pendientes. La publicación en GitHub requiere tu aprobación expresa después de esta revisión.
+Indica los recorridos conformes y los que no ejecutaste. Oculta datos personales y valores privados en las evidencias. Las correcciones posteriores se aplicarán sobre v2.3.0. El correo externo, Google y Decolecta reales, HTTPS público, Railway y la reconstrucción Docker final tienen aceptaciones separadas; la recepción en bandeja no acredita entrega por correo. La publicación en GitHub continúa pendiente de tu aprobación expresa.

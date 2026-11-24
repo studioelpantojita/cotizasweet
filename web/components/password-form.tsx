@@ -1,0 +1,7 @@
+'use client';
+import {useState} from 'react';
+export function PasswordForm(){
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();if(busy)return;const data=Object.fromEntries(new FormData(event.currentTarget));setBusy(true);setError('');try{const response=await fetch('/api/auth/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}),result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo actualizar.');window.location.assign('/auth/login');}catch(e){setError(e instanceof Error?e.message:'No se pudo actualizar.');setBusy(false);}}
+ return <form className="account-form" onSubmit={submit}><label className="field"><span>Password actual *</span><input type="password" name="currentPassword" required autoComplete="current-password" maxLength={128}/></label><label className="field"><span>Nuevo Password *</span><input type="password" name="password" required minLength={15} maxLength={128} autoComplete="new-password"/><small>Entre 15 y 128 caracteres. Al actualizarlo se cerrarán todas las sesiones de tu cuenta.</small></label><label className="field"><span>Confirmar nuevo Password *</span><input type="password" name="confirmation" required minLength={15} maxLength={128} autoComplete="new-password"/></label>{error&&<p className="error" role="alert">{error}</p>}<button className="btn" disabled={busy}>{busy?'Actualizando…':'Cambiar contraseña'}</button></form>;
+}

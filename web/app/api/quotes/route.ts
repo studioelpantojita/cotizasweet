@@ -6,6 +6,9 @@ import {verifyIdentity,RucError} from '@/server/ruc';
 import {readQuoteBody} from '@/server/quote-input';
 import {takeRateLimit} from '@/server/rate-limit';
 import {invalidHistoryCursor,readHistoryCursor} from '@/server/history-page';
+import {archiveQuote} from '@/server/submissions';
+import {getQuoteActor,quoteActorCan,guestOperationLimit} from '@/server/quote-actor';
+import {priceForActor} from '@/server/quote-pricing';
 export const runtime='nodejs';
 const json=(body:unknown,status=200,headers:Record<string,string>={})=>Response.json(body,{status,headers:{'Cache-Control':'no-store',...headers}});
 function ownerRateLimit(owner:string,operation:'read'|'write'){
@@ -43,15 +46,20 @@ export async function GET(request:Request){
 }
 export async function POST(request:Request){
   try{
-    const session=await getSession();if(!session)return json({error:'Inicia sesión para guardar tus presupuestos.'},401);
+    const actor=await getQuoteActor();if(!actor)return json({error:'Elige continuar como invitado o accede a tu cuenta para cotizar.'},401);
     if(!sameOrigin(request))return json({error:'Origen no permitido.'},403);
-    if(!session.scopes.includes('quotes:write'))return json({error:'Permiso quotes:write requerido.'},403);
-    const local=backend()==='next';
-    if(local){const limited=ownerRateLimit(session.owner,'write');if(limited)return limited;}
+    if(!quoteActorCan(actor,'write'))return json({error:'Permiso quotes:write requerido.'},403);
+    const local=actor.kind==='guest'||backend()==='next';
+    if(actor.kind==='guest'){const limited=guestOperationLimit(actor,'write');if(limited)return limited;}
+    else if(local){const limited=ownerRateLimit(actor.owner,'write');if(limited)return limited;}
     const input=await readQuoteBody(request);
     const parsed=createQuoteSchema.safeParse(input);if(!parsed.success)return json({error:parsed.error.issues[0]?.message||'Revisa los campos.'},400);
-    const verified=await verifyIdentity(parsed.data);
-    return local?json(saveQuote(session.owner,verified),201):await forward(session,verified);
+    const verified=await verifyIdentity(priceForActor(parsed.data,actor));
+    if(local)return json(archiveQuote(actor.owner,saveQuote(actor.owner,verified)),201);
+    if(actor.kind!=='account')throw new Error('Una visita no se reenvía al backend de cuentas.');
+    const response=await forward(actor.session,verified);
+    if(!response.ok)return response;
+    return json(archiveQuote(actor.owner,await response.json()),response.status);
   }catch(e){
     if(e instanceof RucError){
       const responseHeaders:Record<string,string>={};

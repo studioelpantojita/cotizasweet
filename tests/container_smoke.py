@@ -74,20 +74,21 @@ def main(build=False):
         ready('http://127.0.0.1:8389/health')
         api=start('api',images['api'],'8388:8000',['ASPNETCORE_ENVIRONMENT=Production','OIDC_ISSUER=https://oidc.invalid','OIDC_AUDIENCE=cotizasweet-test','OIDC_ALLOW_LOCAL_HTTP=false','RUC_SERVICE_URL=http://api-python:8000','BACKUP_DIR=/app/data/backup-smoke','BACKUP_INTERVAL_HOURS=2','BACKUP_KEEP=2'],owned_volumes[1],'api-dotnet')
         ready('http://127.0.0.1:8388/health')
-        web=start('web',images['web'],'3388:3000',['NODE_ENV=production','APP_ORIGIN=https://smoke.invalid','API_BACKEND=dotnet','API_BASE_URL=http://api-dotnet:8000','OIDC_ISSUER=https://oidc.invalid','OIDC_ALLOW_LOCAL_HTTP=false'],owned_volumes[0])
+        web=start('web',images['web'],'3388:3000',['NODE_ENV=production','APP_ORIGIN=https://smoke.invalid','API_BACKEND=dotnet','API_BASE_URL=http://api-dotnet:8000','OIDC_ISSUER=https://oidc.invalid','OIDC_ALLOW_LOCAL_HTTP=false','OIDC_EXTERNAL_LOGIN_ENABLED=true'],owned_volumes[0])
         ready('http://127.0.0.1:3388/api/health')
         for path in ('/','/catalogo','/cotizar','/api/catalog'):http('http://127.0.0.1:3388'+path)
         http('http://127.0.0.1:3388/api/quotes',401)
         http('http://127.0.0.1:8389/api/clients/ruc/20999999990',401)
         http('http://127.0.0.1:3388/api/clients/ruc/20999999990',403)
-        http('http://127.0.0.1:3388/api/clients/ruc/20999999990',503,{'X-Cotiza-Request':'ruc'})
+        http('http://127.0.0.1:3388/api/clients/ruc/20999999990',401,{'X-Cotiza-Request':'ruc'})
         users={}
         for name in owned_containers:
             status=docker('exec',name,'cat','/proc/1/status')
             uid=next(line.split()[1] for line in status.splitlines() if line.startswith('Uid:'))
             assert uid!='0','Application must drop root privileges';users[name.rsplit('-',1)[-1]]=int(uid)
         # Login quota is persisted before the intentionally unconfigured OIDC login fails.
-        http('http://127.0.0.1:3388/auth/login',503)
+        http('http://127.0.0.1:3388/auth/login',200)
+        http('http://127.0.0.1:3388/auth/oidc',503)
         probe="const {DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('/app/data/cotiza.sqlite',{readOnly:true});console.log(d.prepare('select sum(hits) as n from request_limits').get().n);d.close();"
         before=int(docker('exec',web,'node','-e',probe))
         docker('restart',web);ready('http://127.0.0.1:3388/api/health')

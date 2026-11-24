@@ -5,7 +5,7 @@ import type {ProjectType} from '@/lib/quote';
 import {quoteCtaLabel,quoteHref} from '@/lib/project-presentations';
 import {BrandMark} from './brand-mark';
 
-export function SweetHeader({active='home',signedIn=false}:{active?:'home'|'catalog'|'quote';project?:ProjectType;signedIn?:boolean}){
+export function SweetHeader({active='home',signedIn=false,isAdmin=false}:{active?:'home'|'catalog'|'quote';project?:ProjectType;signedIn?:boolean;isAdmin?:boolean}){
  const [open,setOpen]=useState(false);
  const toggle=useRef<HTMLButtonElement>(null);
  return <><a className="sweet-skip" href={active==='quote'?'#cotizador':'#contenido'}>Ir al contenido</a><div className="sweet-topline">PASTELERÍA, PRESENTACIÓN Y PROPUESTAS A MEDIDA</div><header className="sweet-header" onKeyDown={event=>{if(event.key==='Escape'&&open){setOpen(false);toggle.current?.focus();}}}>
@@ -14,7 +14,8 @@ export function SweetHeader({active='home',signedIn=false}:{active?:'home'|'cata
   <nav id="sweet-navigation" className={'sweet-primary-nav '+(open?'is-open':'')} aria-label="Principal" onClick={()=>setOpen(false)}>
    <a href="/catalogo" aria-current={active==='catalog'?'page':undefined}>Catálogo</a>
    <a href="/#como-funciona">Cómo Funciona</a>
-   <a href={signedIn?'/auth/logout':'/auth/login'} className="sweet-nav-access"><UserRound size={15} aria-hidden="true"/>{signedIn?'Cerrar sesión':'Accede'}</a>
+   {isAdmin&&<a href="/admin">Administración</a>}
+   <a href={signedIn?'/cuenta':'/auth/login'} className="sweet-nav-access"><UserRound size={15} aria-hidden="true"/>{signedIn?'Mi cuenta':'Accede'}</a>
   </nav>
  </header></>;
 }

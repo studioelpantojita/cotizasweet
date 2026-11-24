@@ -251,6 +251,46 @@
                   "pera-tropical"
                 ]
               },
+              "catalogId": {
+                "type": "string",
+                "enum": [
+                  "breakfast",
+                  "minibox",
+                  "sweet",
+                  "macarons",
+                  "etiquetas",
+                  "empaque"
+                ]
+              },
+              "flavors": {
+                "minItems": 1,
+                "maxItems": 4,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "vainilla",
+                    "chocolate",
+                    "café",
+                    "frambuesa",
+                    "lucuma",
+                    "naranjo",
+                    "cherry",
+                    "crema pastelera",
+                    "pistacho",
+                    "almendras"
+                  ]
+                }
+              },
+              "presentation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "scope": {
+                "type": "string",
+                "maxLength": 80
+              },
               "quantity": {
                 "type": "integer",
                 "minimum": 1,
@@ -389,6 +429,24 @@
               "const": 2
             }
           ]
+        },
+        "promotion": {
+          "type": "object",
+          "properties": {
+            "campaignId": {
+              "type": "string",
+              "const": "navidad-2026"
+            },
+            "percent": {
+              "type": "number",
+              "const": 20
+            }
+          },
+          "required": [
+            "campaignId",
+            "percent"
+          ],
+          "additionalProperties": false
         },
         "locationMode": {
           "default": "legacy",

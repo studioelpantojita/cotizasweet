@@ -113,15 +113,17 @@ def api_checks(base,google=False):
                 check(client.get('/api/quotes',headers={'Authorization':'Bearer '+invalid}).status_code==401,'Google acepta identidad no verificada o de otro cliente')
             check(client.get('/api/quotes',headers={'Authorization':'Bearer '+token(aud=[AUDIENCE,'another-client'],azp=AUDIENCE)}).status_code==200,'Google rechaza múltiples audiencias con parte autorizada válida')
         auth={'Authorization':'Bearer '+token()}
+        accepted_cases=0
         for case in cases:
-            if case['quote']['pricingVersion']!=2:
+            if case['quote']['pricingVersion']!=2 or case['quote']['items'][0]['priceCents']==101:
                 check(client.post('/api/quotes',json=case['quote'],headers=auth).status_code==400,'Permite precio histórico al crear')
                 continue
             r=client.post('/api/quotes',json=case['quote'],headers=auth)
             check(r.status_code==201,f'No guardó: {r.status_code} {r.text}')
             check(r.json()['totalCents']==case['expected']['total'],'Diferencia en cálculo')
             check(r.json()['quote']['currency']==case['quote'].get('currency','PEN'),'No conserva moneda')
-        check(len(client.get('/api/quotes',headers=auth).json()['quotes'])==sum(c['quote']['pricingVersion']==2 for c in cases),'Historial incorrecto')
+            accepted_cases+=1
+        check(len(client.get('/api/quotes',headers=auth).json()['quotes'])==accepted_cases,'Historial incorrecto')
         check(client.get('/api/quotes',headers={'Authorization':'Bearer '+token('bob')}).json()['quotes']==[],'Fuga entre usuarios')
         for patch in [{'formVersion':1,'contact':'','event':''},{'client':'   '},{'items':[{**quote['items'][0],'name':'   '}]},{'documentType':'ruc','clientType':'empresa','clientDocument':'00000000000'},{'validUntil':'2026-11-20'},{'taxPercent':0},{'deliveryCents':100},{'clientDocument':'1'},{'clientEmail':'invalid'},{'locationMode':'on_location','provinceId':'1501','districtId':'010101'},{'items':[]},{'locationMode':'on_location','provinceId':'1501','districtId':'150130','address':'   '},{'advancePercent':101},{'advancePercent':12.5},{'items':[{**quote['items'][0],'quantity':1.5}]},{'items':[{**quote['items'][0],'priceCents':123.4}]}]:
             r=client.post('/api/quotes',json={**quote,**patch},headers=auth);check(r.status_code==400,'API acepta dato inválido: '+str(patch))
@@ -139,23 +141,26 @@ def api_checks(base,google=False):
         r=client.post('/api/quotes',json=ruc_quote,headers=auth);check(r.status_code==201,'No guarda RUC verificado: '+r.text)
         check(r.json()['quote']['clientLookup']['demo'] is True,'No conserva procedencia RUC')
         natural={**ruc_quote,'clientType':'persona_natural','clientDocument':'10999999994','client':'CLIENTE DE DEMOSTRACIÓN CON RUC'}
-        check(client.post('/api/quotes',json=natural,headers=auth).status_code==201,'Rechaza persona natural con RUC')
+        check(client.post('/api/quotes',json=natural,headers=auth).status_code==400,'Acepta tipo de cliente natural con RUC retirado')
         check(client.post('/api/quotes',content='x'*71000,headers={**auth,'Content-Type':'application/json'}).status_code==413,'Falta límite de tamaño')
         portfolio_checks(client,quote,auth)
 
 def portfolio_checks(client,quote,headers):
-    item={**quote['items'][0],'portfolioId':'delicia-fresas','image':'none','name':'Delicia de fresas','description':'Contenido: 12 porciones.\nPresentación: caja marfil.\nAlcance: recojo, sin montaje.','quantity':2,'priceCents':15000}
+    rates=json.loads((ROOT/'contracts/product-pricing.json').read_text(encoding='utf-8'))
+    rate=rates['portfolio']['delicia-fresas']
+    item={**quote['items'][0],'portfolioId':'delicia-fresas','image':'none','name':'Delicia de fresas','flavors':['vainilla','chocolate'],'presentation':'caja marfil','scope':'Unknown.','description':'Contenido: vainilla, chocolate\nPresentación: caja marfil\nAlcance: Unknown.','quantity':2,'priceCents':rate['prices'][quote['currency']],'unit':rate['unit']}
+    item.pop('catalogId',None)
     custom={**quote,'items':[item],'locationMode':'pickup','provinceId':'','districtId':'','address':'Tienda LosPantojados','materials':[],'materialNotes':''}
     saved=client.post('/api/quotes',json=custom,headers=headers)
     check(saved.status_code==201,'No guarda servicio de cartera: '+saved.text)
-    check(saved.json()['totalCents']==35400,'Importe incorrecto para servicio de cartera')
+    check(saved.json()['totalCents']==round(item['priceCents']*2*1.18),'Importe incorrecto para servicio de cartera')
     stored=next(q for q in client.get('/api/quotes',headers=headers).json()['quotes'] if q['id']==saved.json()['id'])
     check(stored['quote']['items'][0]['portfolioId']=='delicia-fresas' and stored['quote']['items'][0]['description']==item['description'],'Pierde referencia o alcance en historial')
     check(stored['quote']['address']=='Tienda LosPantojados' and stored['quote']['materials']==[],'Altera recojo o requiere insumos')
     check(client.post('/api/quotes',json={**custom,'items':[{**item,'portfolioId':'unknown'}]},headers=headers).status_code==400,'Acepta una referencia de cartera inexistente')
 
 def login(client,user,**authorization):
-    start=client.get('/auth/login');check(start.status_code==307,'No inicia OIDC: '+start.text)
+    start=client.get('/auth/oidc');check(start.status_code==307,'No inicia OIDC: '+start.text)
     location=start.headers['location']+'&'+urlencode({'test_user':user,**authorization})
     query=parse_qs(urlparse(location).query)
     check(query.get('code_challenge_method')==['S256'] and all(x in query for x in ['state','nonce','code_challenge']),'Falta PKCE/state/nonce')
@@ -173,8 +178,11 @@ def web_checks():
         catalog_checks(a)
         check(a.get('/catalogo').status_code==200,'Página de catálogo no disponible')
         check(a.get('/').status_code==200,'HOME no responde')
-        check(a.get('/cotizar').status_code==200,'Cotizador no responde')
+        check(a.get('/cotizar').status_code==200,'Cotizador debe permitir elegir invitado o registro')
         check(a.get('/api/quotes',headers={'oai-authenticated-user-id':'spoofed','oai-authenticated-user-email':'fake@example.test'}).status_code==401,'Se aceptó identidad por cabecera')
+        check(a.get('/api/clients/ruc/20999999990',headers={'X-Cotiza-Request':'ruc'}).status_code==401,'RUC acepta consulta anónima')
+        check(a.post('/api/quotes/validate',json=quote,headers={'Origin':origin}).status_code==401,'Validación acepta anónimo')
+        login(a,'web-alice');login(b,'web-bob')
         for ruc,status in [('00000000000',400),('20131312954',400),('20131312955',404),('20999999990',200)]:
             result=a.get('/api/clients/ruc/'+ruc,headers={'X-Cotiza-Request':'ruc'});check(result.status_code==status,'Consulta RUC: '+result.text)
         for headers in [{},{'X-Cotiza-Request':'ruc','Sec-Fetch-Site':'cross-site'},{'X-Cotiza-Request':'ruc','Origin':'https://another.example.test'}]:
@@ -184,7 +192,6 @@ def web_checks():
         check(a.post('/api/quotes/validate',json={**ruc_quote,'client':'Manipulado'},headers={'Origin':origin}).status_code==400,'PDF acepta razón social manipulada')
         check(a.post('/api/quotes/validate',json=ruc_quote,headers={'Origin':origin}).status_code==200,'PDF no verifica RUC')
         check(a.post('/api/quotes/validate',json={**quote,'formVersion':1},headers={'Origin':origin}).status_code==400,'PDF acepta formulario histórico nuevo')
-        login(a,'web-alice');login(b,'web-bob')
         check(a.post('/api/quotes',json=quote,headers={'Origin':'https://evil.example'}).status_code==403,'CSRF aceptado')
         r=a.post('/api/quotes',json=quote,headers={'Origin':origin});check(r.status_code==201,'BFF no guarda: '+r.text)
         check(r.json()['totalCents']==33984,'BFF importe incorrecto')
@@ -201,7 +208,7 @@ def web_checks():
         check(a.post('/api/auth/logout',headers={'Origin':origin}).status_code==200,'Logout falló')
         check(a.get('/api/quotes').status_code==401,'Sesión revocada sigue vigente')
     with httpx.Client(base_url=origin,timeout=30,trust_env=False) as c:
-        start=c.get('/auth/login');authorize=c.get(start.headers['location']);url=authorize.headers['location']
+        start=c.get('/auth/oidc');authorize=c.get(start.headers['location']);url=authorize.headers['location']
         url=url.split('&state=')[0]+'&state=invalid'
         check(c.get(url).status_code==401,'State inválido aceptado')
 
@@ -253,7 +260,7 @@ def scope_fallback_checks():
 def google_callback_checks():
     for identity in ('wrong-azp','unverified'):
         with httpx.Client(base_url='http://127.0.0.1:3190',timeout=60,trust_env=False) as client:
-            start=client.get('/auth/login')
+            start=client.get('/auth/oidc')
             check(start.status_code==307,'No inicia transacción Google de regresión')
             authorize=client.get(start.headers['location']+'&'+urlencode({'test_identity':identity}))
             check(client.get(authorize.headers['location']).status_code==401,'Callback Google acepta correo o parte autorizada inválidos')
@@ -267,6 +274,7 @@ def run(mode,provider='standard'):
         env={**{k:v for k,v in os.environ.items() if not k.lower().endswith('_proxy')},'OIDC_PROVIDER':provider,'OIDC_ISSUER':ISSUER,'OIDC_AUDIENCE':AUDIENCE,'OIDC_CLIENT_ID':CLIENT,'OIDC_CLIENT_SECRET':SECRET,'SESSION_SECRET':secrets.token_hex(32),'OIDC_ALLOW_LOCAL_HTTP':'true','APP_ENV':'development','ASPNETCORE_ENVIRONMENT':'Development','APP_ORIGIN':'http://127.0.0.1:3190','API_BACKEND':mode,'API_BASE_URL':'http://127.0.0.1:8190','NEXT_TELEMETRY_DISABLED':'1','NODE_ENV':'development','NEXT_DIST_DIR':'.next-test','RUC_PROVIDER':'demo','INTEGRATION_SERVICE_KEY':secrets.token_urlsafe(48),'RUC_SERVICE_URL':'http://127.0.0.1:8191'}
         # Operator backup settings must never redirect a synthetic run into real storage.
         env.update(BACKUP_DIR=str(Path(temp)/'automatic-backups'),BACKUP_INTERVAL_HOURS='2',BACKUP_KEEP='2')
+        env.update(OIDC_EXTERNAL_LOGIN_ENABLED='true',ACCOUNT_AUTH_ENABLED='false')
         with open(Path(temp)/'services.log','w+') as log:
             try:
                 ruc=OwnedProcess([sys.executable,'-m','uvicorn','ruc_service:app','--host','127.0.0.1','--port','8191','--no-access-log'],cwd=ROOT/'api-python',env=env,stdout=log,stderr=log);processes.append(ruc);wait_http('http://127.0.0.1:8191/health',ruc)

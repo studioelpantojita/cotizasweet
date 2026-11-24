@@ -4,6 +4,8 @@ import {pickupAddress} from './pickup-location';
 import {clientDocumentType,isValidRuc} from './identity';
 import {ingredientConfigSchema,emptyIngredientConfig,ingredientDefinition} from './ingredients';
 import {provinces,districts} from './peru-ubigeo';
+import {acceptedFlavors,productCreationIssues,productRate} from './product-pricing';
+import {promotionSchema,promotionEventEligible} from './promotion';
 z.setErrorMap(issue=>({message:issue.code==='too_small'?'Completa el campo requerido o revisa el valor mínimo.':issue.code==='too_big'?'El dato supera el límite permitido.':issue.code==='invalid_type'?'Revisa el tipo de dato de este campo.':issue.code==='invalid_format'?'El formato del dato no es válido.':'Revisa el valor de este campo.'}));
 const short=z.string().trim().max(120);
 export const rucIdentitySchema=z.object({ruc:z.string().regex(/^\d{11}$/),legalName:z.string().min(1).max(300),status:z.string().max(80),condition:z.string().max(80),source:z.string().max(160),checkedAt:z.string().datetime({offset:true}),dataDate:z.string().max(40).optional(),demo:z.boolean()}).strict();
@@ -32,7 +34,7 @@ export const collections=[
 export const projectInfo=(id:string)=>projectTypes.find(p=>p.id===id)||projectTypes[projectTypes.length-1];
 export const imageKeys=['cake','cupcakes','wedding','breakfast','minibox','sweet','none'] as const;
 export type ImageKey=typeof imageKeys[number];
-export const itemSchema=z.object({id:z.string().max(60),name:short.min(1),description:z.string().trim().max(300),image:z.enum(imageKeys),portfolioId:z.enum(showcase.map(p=>p.id) as [string,...string[]]).optional(),quantity:z.number({error:'Ingresa una cantidad entera entre 1 y 999.'}).int('La cantidad debe ser entera.').min(1,'La cantidad mínima es 1.').max(999,'La cantidad máxima es 999.'),priceCents:z.number({error:'Ingresa un precio con hasta dos decimales; escribe 0 si no tiene cargo.'}).int('El precio admite hasta dos decimales.').min(0,'El precio no puede ser negativo.').max(100000000,'El precio unitario máximo es 1,000,000.00 en la moneda seleccionada.'),category:z.enum(['pack','addon']).default('pack'),unit:z.string().trim().min(1).max(60).default('unidad')}).strict();
+export const itemSchema=z.object({id:z.string().max(60),name:short.min(1),description:z.string().trim().max(300),image:z.enum(imageKeys),portfolioId:z.enum(showcase.map(p=>p.id) as [string,...string[]]).optional(),catalogId:z.enum(['breakfast','minibox','sweet','macarons','etiquetas','empaque']).optional(),flavors:z.array(z.enum(acceptedFlavors)).min(1).max(4).optional(),presentation:z.string().trim().min(1).max(80).optional(),scope:z.string().trim().max(80).optional(),quantity:z.number({error:'Ingresa una cantidad entera entre 1 y 999.'}).int('La cantidad debe ser entera.').min(1,'La cantidad mínima es 1.').max(999,'La cantidad máxima es 999.'),priceCents:z.number({error:'Ingresa un precio con hasta dos decimales; escribe 0 si no tiene cargo.'}).int('El precio admite hasta dos decimales.').min(0,'El precio no puede ser negativo.').max(100000000,'El precio unitario máximo es 1,000,000.00 en la moneda seleccionada.'),category:z.enum(['pack','addon']).default('pack'),unit:z.string().trim().min(1).max(60).default('unidad')}).strict();
 export const materialSchema=z.object({name:short.min(1),detail:z.string().trim().max(400),confirmed:z.boolean().default(false),selected:z.boolean().optional(),configuration:ingredientConfigSchema.default(emptyIngredientConfig)}).strict();
 const quoteFields=z.object({
  currency:z.enum(['PEN','USD']).default('PEN'),
@@ -46,6 +48,7 @@ const quoteFields=z.object({
  materials:z.array(materialSchema).max(8).default([]),
  dietaryRequirements:z.string().trim().max(600).default(''),allergenNotes:z.string().trim().max(600).default(''),allergenReviewed:z.boolean().default(false),
  pricingVersion:z.union([z.literal(1),z.literal(2)]).default(1),
+ promotion:promotionSchema.optional(),
  locationMode:z.enum(['on_location','pickup','legacy']).default('legacy'),provinceId:z.string().max(4).default(''),districtId:z.string().max(6).default(''),address:z.string().trim().max(220).default(''),
  taxPercent:z.union([z.literal(0),z.literal(18)]).default(0),materialNotes:z.string().trim().max(1600).default(''),
  deliveryCents:z.number().int().min(0).max(100000000),advancePercent:z.number({error:'Ingresa un porcentaje entero entre 0 y 100.'}).int('El anticipo debe ser un porcentaje entero.').min(0,'El anticipo no puede ser menor a 0%.').max(100,'El anticipo no puede superar el 100%.'),notes:z.string().trim().max(1600),
@@ -65,6 +68,7 @@ export const quoteSchema=quoteFields.superRefine((q,ctx)=>{
  const sweet=m.configuration.selections.sweetener??[];if(sweet.includes('Sin endulzante añadido')&&sweet.length>1)fail('materials','Revisa la selección de endulzantes.');}
  if(q.validUntil<q.issued)fail('validUntil','La validez debe ser igual o posterior a la emisión.');
  if(q.eventDate&&q.eventDate<q.issued)fail('eventDate','La fecha del evento debe ser igual o posterior a la emisión.');
+ if(q.promotion&&(!promotionEventEligible(q.eventDate)||q.pricingVersion!==2))fail('promotion','La promoción navideña sólo corresponde a eventos del 30/11/2026 al 02/01/2027 con las condiciones actuales.');
  if(q.pricingVersion===2){
   if(q.taxPercent!==18)fail('taxPercent','La tasa configurada para esta propuesta es 18%.');
   if(q.validUntil>addDays(q.issued,21))fail('validUntil','La vigencia no puede superar 21 días calendario desde la emisión.');
@@ -84,7 +88,11 @@ export const createQuoteSchema=z.preprocess(normalizeStrings,quoteSchema.superRe
  if(q.formVersion!==2||q.pricingVersion!==2)ctx.addIssue({code:'custom',path:['formVersion'],message:'Las nuevas cotizaciones requieren el formulario y los precios actuales. Actualiza las condiciones de la propuesta histórica.'});
  if(q.locationMode==='on_location'&&!q.address)ctx.addIssue({code:'custom',path:['address'],message:'Indica la dirección o referencia para entregar el pedido en locación.'});
  if(!/^(?:\+51 ?)?[0-9]{9}$/.test(q.contact))ctx.addIssue({code:'custom',path:['contact'],message:'Ingresa un teléfono de 9 dígitos, sin incluir el código +51.'});
-}));
+ if(!q.eventDate)ctx.addIssue({code:'custom',path:['eventDate'],message:'La fecha del evento es obligatoria.'});
+ if(q.advancePercent!==50)ctx.addIssue({code:'custom',path:['advancePercent'],message:'El anticipo configurado para nuevas propuestas es 50%.'});
+ if(q.clientType==='persona_natural'&&clientDocumentType(q)!=='dni')ctx.addIssue({code:'custom',path:['documentType'],message:'Selecciona Persona Natural con DNI o Empresa con RUC.'});
+ q.items.forEach((item,index)=>{for(const issue of productCreationIssues(item,q.currency))ctx.addIssue({code:'custom',path:['items',index,issue.field],message:issue.message});});
+}).transform(q=>({...q,items:q.items.map(item=>item.portfolioId?{...item,scope:item.scope?.trim()||'Unknown.'}:item)})));
 export type Quote=z.infer<typeof quoteSchema>;
 export type QuoteItem=z.infer<typeof itemSchema>;
 export type SavedQuote={id:string;createdAt:string;quote:Quote;totalCents:number};
@@ -98,14 +106,17 @@ export const addons:QuoteItem[]=[
  {id:'etiquetas',name:'Etiquetas con logotipo',description:'Personalización por etiqueta. Arte final y dimensiones sujetos a aprobación del cliente.',image:'none',priceCents:200,quantity:1,category:'addon',unit:'etiqueta'},
  {id:'empaque',name:'Empaque de lujo con lazo de satén',description:'Presentación de regalo por empaque. Tamaño y color de lazo por confirmar.',image:'none',priceCents:1800,quantity:1,category:'addon',unit:'empaque'},
 ];
+// Product identity survives a new line UUID. Historical records are never rewritten.
+for(const item of [...catalog,...addons]){const rate=productRate('catalog',item.id)!;item.catalogId=item.id as NonNullable<QuoteItem['catalogId']>;item.unit=rate.unit;item.priceCents=rate.prices.PEN;}
 export function newMaterials(){return [{name:'Chocolates finos',detail:'',confirmed:false,selected:false,configuration:emptyIngredientConfig()},{name:'Insumos orgánicos',detail:'',confirmed:false,selected:false,configuration:emptyIngredientConfig()},{name:'Producción artesanal',detail:'',confirmed:false,selected:false,configuration:emptyIngredientConfig()}];}
 export function totals(q:Quote){
  const packs=q.items.filter(i=>i.category!=='addon').reduce((s,i)=>s+i.priceCents*i.quantity,0);
  const addons=q.items.filter(i=>i.category==='addon').reduce((s,i)=>s+i.priceCents*i.quantity,0);
  const subtotal=packs+addons,mobilityRate=q.pricingVersion===2&&q.locationMode==='on_location'?5:0;
- const mobility=q.pricingVersion===2?Math.round(subtotal*mobilityRate/100):q.deliveryCents;
- const base=subtotal+mobility,tax=q.pricingVersion===2?Math.round(base*18/100):0,total=base+tax,advance=Math.round(total*q.advancePercent/100);
- return{subtotal,total,advance,balance:total-advance,packs,addons,mobility,mobilityRate,base,tax};
+ const discount=q.promotion?Math.round(subtotal*q.promotion.percent/100):0,netServices=subtotal-discount;
+ const mobility=q.pricingVersion===2?Math.round(netServices*mobilityRate/100):q.deliveryCents;
+ const base=netServices+mobility,tax=q.pricingVersion===2?Math.round(base*18/100):0,total=base+tax,advance=Math.round(total*q.advancePercent/100);
+ return{subtotal,total,advance,balance:total-advance,packs,addons,mobility,mobilityRate,base,tax,discount,netServices};
 }
 export function addDays(iso:string,days:number){const d=new Date(iso+'T12:00:00Z');if(Number.isNaN(d.getTime()))return '';d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
 export function materialSelected(m:Quote['materials'][number]){return m.selected??!!m.detail.trim();}

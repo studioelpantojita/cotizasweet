@@ -1,5 +1,4 @@
-// Visual references are intentionally separate from priced, saleable services.
-// A quote may reference a photograph only after the user defines its scope and price.
+// Photographs remain visual references. The quotation uses an explicit referential tariff and selected service details.
 export type ShowcaseCategory = 'cakes' | 'macarons' | 'chocolates';
 export type ShowcasePiece = {id:string; name:string; category:ShowcaseCategory; image:string; description:string; format:string};
 export const showcaseCategories = [
@@ -29,5 +28,5 @@ export const showcase:ShowcasePiece[] = [
 export const normalizeSearch=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es');
 export function filterShowcase(category:string,query:string){
  const terms=normalizeSearch(query).trim().split(/\s+/).filter(Boolean);
- return showcase.filter(p=>(category==='selection'||p.category===category)&&terms.every(t=>normalizeSearch(`${p.name} ${p.description} ${p.format} ${showcaseCategories.find(c=>c.id===p.category)?.label}`).includes(t)));
+ return showcase.filter(p=>(category==='selection'||category.split('-').includes(p.category))&&terms.every(t=>normalizeSearch(`${p.name} ${p.description} ${p.format} ${showcaseCategories.find(c=>c.id===p.category)?.label}`).includes(t)));
 }

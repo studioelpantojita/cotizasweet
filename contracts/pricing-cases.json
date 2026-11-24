@@ -27,10 +27,11 @@
           "name": "Boxes de Mini Repostería",
           "description": "Box de 24 piezas: mini tartaletas, petits fours y macarons. Sabores y selección por coordinar.",
           "image": "minibox",
+          "catalogId": "minibox",
           "quantity": 2,
           "priceCents": 14400,
           "category": "pack",
-          "unit": "box de 24 piezas"
+          "unit": "box"
         }
       ],
       "materials": [
@@ -92,7 +93,9 @@
       "mobility": 0,
       "mobilityRate": 0,
       "base": 28800,
-      "tax": 5184
+      "tax": 5184,
+      "discount": 0,
+      "netServices": 28800
     }
   },
   {
@@ -123,10 +126,11 @@
           "name": "Boxes de Mini Repostería",
           "description": "Box de 24 piezas: mini tartaletas, petits fours y macarons. Sabores y selección por coordinar.",
           "image": "minibox",
+          "catalogId": "minibox",
           "quantity": 2,
           "priceCents": 14400,
           "category": "pack",
-          "unit": "box de 24 piezas"
+          "unit": "box"
         }
       ],
       "materials": [
@@ -188,7 +192,9 @@
       "mobility": 1440,
       "mobilityRate": 5,
       "base": 30240,
-      "tax": 5443
+      "tax": 5443,
+      "discount": 0,
+      "netServices": 28800
     }
   },
   {
@@ -219,10 +225,11 @@
           "name": "Boxes de Mini Repostería",
           "description": "Box de 24 piezas: mini tartaletas, petits fours y macarons. Sabores y selección por coordinar.",
           "image": "minibox",
+          "catalogId": "minibox",
           "quantity": 2,
           "priceCents": 14400,
           "category": "pack",
-          "unit": "box de 24 piezas"
+          "unit": "box"
         }
       ],
       "materials": [
@@ -284,7 +291,9 @@
       "mobility": 1700,
       "mobilityRate": 0,
       "base": 30500,
-      "tax": 0
+      "tax": 0,
+      "discount": 0,
+      "netServices": 28800
     }
   },
   {
@@ -315,10 +324,11 @@
           "name": "Desayunos Premium",
           "description": "Box individual con croissant artesanal, mini repostería, mermelada y bebida. Contenido final por confirmar.",
           "image": "breakfast",
+          "catalogId": "breakfast",
           "quantity": 1,
           "priceCents": 101,
           "category": "pack",
-          "unit": "box individual"
+          "unit": "box"
         }
       ],
       "materials": [
@@ -380,7 +390,9 @@
       "mobility": 5,
       "mobilityRate": 5,
       "base": 106,
-      "tax": 19
+      "tax": 19,
+      "discount": 0,
+      "netServices": 101
     }
   }
 ]

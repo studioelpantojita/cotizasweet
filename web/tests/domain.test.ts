@@ -29,10 +29,11 @@ test('incomplete drafts retain the project before services are chosen without we
  assert.equal(draftSchema.safeParse({...draft,items:Array.from({length:31},(_,i)=>({...item,id:'draft-'+i}))}).success,false);
  assert.equal(draftSchema.safeParse({...draft,items:[{...item,quantity:-1}]}).success,false);
 });
-test('RUC checksum and independent document type for natural persons',()=>{
+test('RUC checksum and natural-person DNI on new proposals',()=>{
  for(const ruc of ['20131312955','20999999990','10999999994'])assert.equal(isValidRuc(ruc),true);
  for(const ruc of ['00000000000','20131312954','2013131295','99999999999','２０１３１３１２９５５'])assert.equal(isValidRuc(ruc),false);
- assert.equal(createQuoteSchema.safeParse({...cases[0].quote,documentType:'ruc',clientDocument:'10999999994'}).success,true);
+ assert.equal(createQuoteSchema.safeParse({...cases[0].quote,documentType:'ruc',clientDocument:'10999999994'}).success,false);
+ assert.equal(quoteSchema.safeParse({...cases[0].quote,documentType:'ruc',clientDocument:'10999999994'}).success,true);
 });
 test('payment conditions match advance and balance',()=>{
  const q=cases[0].quote;

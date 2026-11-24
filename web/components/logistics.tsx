@@ -1,6 +1,6 @@
 'use client';
 import {useMemo,useRef} from 'react';
-import {FieldError,useFieldValidation,QuoteNumberInput} from './quote-validation';
+import {FieldError,useFieldValidation} from './quote-validation';
 import {MapPin} from 'lucide-react';
 import {Combobox,ComboboxInput,ComboboxContent,ComboboxEmpty,ComboboxList,ComboboxItem} from '@/components/ui/combobox';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
@@ -28,9 +28,7 @@ export function ValidityFields({q,onChange}:{q:Quote;onChange:(patch:Partial<Quo
  return <section className="form-section validity-section" aria-labelledby="validity-heading"><div className="form-title"><span>04</span><h3 id="validity-heading">Vigencia e impuestos</h3></div><div className="fields">
  <label className="field" data-field="issued"><span>Fecha de emisión *</span><input {...fieldState('issued')} type="date" value={q.issued} onChange={e=>{const issued=e.target.value;if(!issued){onChange({issued});return;}const limit=addDays(issued,21);onChange({issued,validUntil:!q.validUntil||q.validUntil<issued||(current&&q.validUntil>limit)?limit:q.validUntil});}}/><FieldError path="issued"/></label>
  <label className="field" data-field="validUntil"><span>Válida hasta *</span><input {...fieldState('validUntil')} type="date" value={q.validUntil} min={q.issued} max={current?addDays(q.issued,21):undefined} onChange={e=>onChange({validUntil:e.target.value})}/><small>{current?'Hasta 21 días calendario desde la emisión.':'Vigencia de la propuesta original.'}</small><FieldError path="validUntil"/></label>
- <label className="field"><span>IGV (%)</span><input className="readonly-field" type="number" readOnly value={current?18:0}/><small>{current?'18% sobre servicios más movilidad. Se incluye automáticamente en el total.':'La propuesta anterior conserva sus precios finales.'}</small></label>
- <label className="field" data-field="advancePercent"><span>Anticipo (%)</span><QuoteNumberInput {...fieldState('advancePercent')} value={q.advancePercent} min={0} max={100} step={1} onValue={advancePercent=>onChange({advancePercent})}/><small>El saldo se calcula sobre el total con IGV.</small><FieldError path="advancePercent"/></label>
- </div></section>;
+ </div><p className="field-help validity-tax-note">{current?'El total incluye IGV del 18% sobre los servicios y la movilidad.':'La propuesta anterior conserva sus precios finales.'}</p><p className="field-help validity-advance-note" data-field="advancePercent">{q.advancePercent===50?'Se deberá abonar el 50% de anticipo por el servicio.':`Esta propuesta conserva el anticipo registrado anteriormente: ${q.advancePercent}%.`}</p><FieldError path="advancePercent"/></section>;
 }
 export function ConditionsFields({q,onChange}:{q:Quote;onChange:(patch:Partial<Quote>)=>void}){
  const fieldState=useFieldValidation();

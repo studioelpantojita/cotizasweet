@@ -1,4 +1,5 @@
 import {catalog,addons,projectInfo,totals,type Quote,type QuoteItem,type ProjectType} from './quote';
+import {repriceItems} from './product-pricing';
 export type PackageId='essential'|'signature'|'premium';
 export type ServicePackage={id:PackageId;name:string;description:string;items:QuoteItem[];notes:string};
 const line=(key:string,quantity:number):QuoteItem=>({...([...catalog,...addons].find(i=>i.id===key)!),quantity,id:key});
@@ -23,6 +24,6 @@ const descriptions:Record<string,string[]>={
  custom:['Una atención individual como punto de partida.','Un box con presentación de regalo.','Dos combos con presentación a medida.'],
 };
 export function packagesFor(project:ProjectType):ServicePackage[]{const info=projectInfo(project);return (['essential','signature','premium'] as const).map((id,i)=>({id,name:['Esencial','Signature','Alta Vitrina'][i],description:descriptions[project][i],items:recipes[info.group][i].map(([key,n])=>line(key,n)),notes:`Propuesta para ${info.label.toLowerCase()}. Contenido, sabores, diseño y disponibilidad sujetos a confirmación. ${info.group==='corporativo'||info.group==='experiencias'?'El cliente aprueba el logotipo y las etiquetas antes de producir.':'La temática y la presentación se acuerdan antes de producir.'} Los cambios de alcance se cotizan por separado.`}));}
-export function packageEstimate(p:ServicePackage,q:Quote){return totals({...q,items:p.items});}
+export function packageEstimate(p:ServicePackage,q:Quote){return totals({...q,items:repriceItems(p.items,q.currency)});}
 export function recommendPackage(q:Quote){const options=packagesFor(q.projectType);const preferred=['bodas','rrpp','cocteles','lanzamientos'].includes(q.projectType)?2:['fitness','alergias','custom'].includes(q.projectType)?0:1;const fits=q.clientBudgetCents===null?options[preferred]:options.slice(0,preferred+1).filter(p=>packageEstimate(p,q).total<=q.clientBudgetCents!).at(-1);return{id:fits?.id??'essential',withinBudget:q.clientBudgetCents===null||!!fits};}
-export function packagePatch(q:Quote,id:PackageId,idFactory:()=>string):Partial<Quote>{const p=packagesFor(q.projectType).find(p=>p.id===id)!;return{packageId:id,packageName:`${p.name} · ${projectInfo(q.projectType).label}`,items:p.items.map(item=>({...item,id:idFactory()})),notes:p.notes,allergenReviewed:false};}
+export function packagePatch(q:Quote,id:PackageId,idFactory:()=>string):Partial<Quote>{const p=packagesFor(q.projectType).find(p=>p.id===id)!;return{packageId:id,packageName:`${p.name} · ${projectInfo(q.projectType).label}`,items:repriceItems(p.items,q.currency).map(item=>({...item,id:idFactory()})),notes:p.notes,allergenReviewed:false};}

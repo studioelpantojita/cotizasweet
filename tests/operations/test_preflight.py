@@ -23,6 +23,10 @@ def synthetic_configuration():
         'OIDC_AUDIENCE': 'sweet-api',
         'OIDC_SCOPE': 'openid profile email quotes:read quotes:write',
         'SESSION_SECRET': '0123456789abcdef' * 4,
+        'ACCOUNT_AUTH_ENABLED':'true',
+        'ACCOUNT_ISSUER':'https://cotizasweet.production-check.io/accounts',
+        'ACCOUNT_JWT_SECRET':'fedcba9876543210' * 4,
+        'OIDC_EXTERNAL_LOGIN_ENABLED':'false',
         'INTEGRATION_SERVICE_KEY': 'SYNTHETIC_INTEGRATION_CREDENTIAL_123',
         'RUC_PROVIDER': 'decolecta',
         'RUC_API_TOKEN': 'SYNTHETIC_RUC_CREDENTIAL_123',
@@ -34,6 +38,11 @@ def synthetic_configuration():
 
 
 class PreflightTests(unittest.TestCase):
+    def test_application_credentials_are_required_and_secrets_independent(self):
+        for patch in ({'ACCOUNT_AUTH_ENABLED':'false'},{'ACCOUNT_ISSUER':'https://other.io/accounts'},{'ACCOUNT_JWT_SECRET':''},{'ACCOUNT_JWT_SECRET':'a'*64},{'ACCOUNT_JWT_SECRET':synthetic_configuration()['SESSION_SECRET']},{'OIDC_EXTERNAL_LOGIN_ENABLED':'yes'}):
+            with self.subTest(patch=list(patch)):
+                self.assertEqual(preflight.evaluate({**synthetic_configuration(),**patch})['status'],'failed')
+
     def test_backup_options_are_optional_and_accept_defaults_disabled_and_custom_values(self):
         defaults = preflight.evaluate(synthetic_configuration())
         self.assertEqual(defaults['status'], 'passed')

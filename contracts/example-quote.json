@@ -25,10 +25,11 @@
       "name": "Boxes de Mini Repostería",
       "description": "Box de 24 piezas: mini tartaletas, petits fours y macarons. Sabores y selección por coordinar.",
       "image": "minibox",
+      "catalogId": "minibox",
       "quantity": 2,
       "priceCents": 14400,
       "category": "pack",
-      "unit": "box de 24 piezas"
+      "unit": "box"
     }
   ],
   "materials": [

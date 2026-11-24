@@ -56,14 +56,16 @@ def oracle(q):
     packs = sum(int(i['priceCents']) * int(i['quantity']) for i in q['items'] if i['category'] != 'addon')
     addons = sum(int(i['priceCents']) * int(i['quantity']) for i in q['items'] if i['category'] == 'addon')
     subtotal = packs + addons
+    discount = pct(subtotal,q['promotion']['percent']) if q.get('promotion') else 0
+    net_services = subtotal - discount
     rate = 5 if q['pricingVersion'] == 2 and q['locationMode'] == 'on_location' else 0
-    mobility = pct(subtotal, rate) if q['pricingVersion'] == 2 else q['deliveryCents']
-    base = subtotal + mobility
+    mobility = pct(net_services, rate) if q['pricingVersion'] == 2 else q['deliveryCents']
+    base = net_services + mobility
     tax = pct(base, 18) if q['pricingVersion'] == 2 else 0
     total = base + tax
     advance = pct(total, q['advancePercent'])
     return dict(subtotal=subtotal, total=total, advance=advance, balance=total-advance,
-                packs=packs, addons=addons, mobility=mobility, mobilityRate=rate, base=base, tax=tax)
+                packs=packs, addons=addons, mobility=mobility, mobilityRate=rate, base=base, tax=tax,discount=discount,netServices=net_services)
 
 
 def financial_cases():
@@ -87,6 +89,12 @@ def financial_cases():
     q = qcase(advancePercent=99, locationMode='on_location', provinceId='1501', districtId='150130', address='QA')
     q['items'] = [{**q['items'][0], 'id':f'max-{i}', 'quantity':999, 'priceCents':100000000} for i in range(30)]
     cases.append(q)
+    for cents in (0,1,2,5,99,101,14400,100000000):
+        for location in ('pickup','on_location'):
+            promo=qcase(issued='2026-11-23',validUntil='2026-12-14',eventDate='2026-11-30',promotion={'campaignId':'navidad-2026','percent':20},locationMode=location)
+            promo['items']=[{**promo['items'][0],'quantity':1,'priceCents':cents}]
+            if location=='on_location':promo.update(provinceId='1501',districtId='150130',address='Referencia QA')
+            cases.append(promo)
     return cases
 
 
@@ -96,7 +104,7 @@ CASES = financial_cases()
 def financial_assertions(module, full=True):
     cases = CASES if full else CASES[:400] + CASES[-151:]
     for idx, q in enumerate(cases):
-        actual = module.totals(module.validate_quote(q, creating=True))
+        actual = module.totals(module.validate_quote(q))
         require(actual == oracle(q), f'financial case {idx}: {actual} != {oracle(q)}')
         require(all(isinstance(v, int) for v in actual.values()), 'Amounts must remain integer cents')
         require(actual['advance'] + actual['balance'] == actual['total'], 'Advance/balance identity')
@@ -108,6 +116,7 @@ def invalid_cases():
     invalid = [qcase(**patch) for patch in (
         {'formVersion':1}, {'pricingVersion':1}, {'contact':'90000000'}, {'contact':'9000000000'},
         {'contact':'90000000x'}, {'advancePercent':-1}, {'advancePercent':101}, {'advancePercent':0.5},
+        {'advancePercent':30}, {'eventDate':''}, {'clientType':'persona_natural','documentType':'ruc','clientDocument':'10999999994'},
         {'currency':'EUR'}, {'currency':None}, {'client':'  '}, {'client':'A'*301},
         {'notes':'A'*1601}, {'event':'A'*121}, {'issued':'2026-02-30'}, {'eventDate':'2026-01-01'},
         {'validUntil':'2026-12-31'}, {'validUntil':str(__import__('datetime').date.fromisoformat(q['issued']) + __import__('datetime').timedelta(days=22))},
@@ -119,6 +128,16 @@ def invalid_cases():
                   {'quantity':0}, {'quantity':1000}, {'quantity':0.5}, {'name':'  '}, {'portfolioId':'unknown'}):
         invalid.append(qcase(items=[{**q['items'][0], **patch}]))
     invalid.extend([qcase(items=[]), qcase(items=[{**q['items'][0], 'id':str(i)} for i in range(31)])])
+    invalid.append(qcase(items=[{**q['items'][0],'priceCents':q['items'][0]['priceCents']+1}]))
+    invalid.append(qcase(items=[{**q['items'][0],'unit':'unidad libre'}]))
+    stripped={k:v for k,v in q['items'][0].items() if k!='catalogId'}
+    invalid.append(qcase(items=[stripped]))
+    portfolio=dict(id='synthetic-portfolio',portfolioId='delicia-fresas',name='Delicia de fresas',image='none',category='pack',unit='unidad',quantity=1,priceCents=14400,
+                   flavors=['vainilla','vainilla'],presentation='Caja',scope='Unknown.',description='Contenido: vainilla, vainilla\nPresentación: Caja\nAlcance: Unknown.')
+    invalid.append(qcase(items=[portfolio]))
+    missing={k:v for k,v in portfolio.items() if k not in ('presentation',)}
+    missing.update(flavors=['vainilla'],description='Contenido: vainilla\nPresentación: \nAlcance: Unknown.')
+    invalid.append(qcase(items=[missing]))
     return invalid
 
 
@@ -179,6 +198,15 @@ def mutations():
         ('omit-phone-check', "if creating and not re.fullmatch(r'(?:\\+51 ?)?[0-9]{9}',q['contact']):", 'if False:'),
         ('omit-address-check', "if creating and q['locationMode'] == 'on_location' and not q['address']:", 'if False:'),
         ('extend-validity', 'dt.timedelta(days=21)', 'dt.timedelta(days=22)'),
+        ('omit-event-date', "if not q['eventDate']: raise ValueError('La fecha del evento es obligatoria.')", 'if False: raise ValueError()'),
+        ('omit-fixed-advance', "if q['advancePercent'] != 50: raise ValueError('El anticipo para nuevas propuestas es 50%.')", 'if False: raise ValueError()'),
+        ('omit-product-tariff', "if rate and (item['priceCents'] != rate['prices'][q['currency']] or item['unit'] != rate['unit']):", 'if False:'),
+        ('omit-custom-price-guard', "if not portfolio and not catalog and (item['priceCents'] != 0 or item['unit'] != 'servicio'):", 'if False:'),
+        ('allow-duplicate-flavors', 'or len(set(flavors)) != len(flavors)', ''),
+        ('allow-natural-ruc', "if q['clientType'] == 'persona_natural' and (q.get('documentType') or ('ruc' if len(q['clientDocument']) == 11 else 'dni')) != 'dni':", 'if False:'),
+        ('omit-promotion-discount', "discount = percent(subtotal,q['promotion']['percent']) if q.get('promotion') else 0", 'discount = 0'),
+        ('mobility-before-discount', 'mobility = percent(net_services, rate)', 'mobility = percent(subtotal, rate)'),
+        ('allow-unauthorized-promotion', "if allow_promotion is not True or not '2026-11-23' <= today <= '2027-01-02':", 'if False:'),
     ]
     results = []
     for name, old, new in definitions:
@@ -190,6 +218,7 @@ def mutations():
         try:
             financial_assertions(mutated, full=False)
             validation_assertions(mutated)
+            promotion_authorization_assertions(mutated)
         except AssertionError as exc:
             killed = True
             reason = str(exc)[:250]
@@ -197,6 +226,15 @@ def mutations():
     survivors = [x['mutant'] for x in results if x['status']!='killed']
     require(not survivors, 'Surviving mutants: '+', '.join(survivors))
     return {'generated':len(results), 'killed':len(results), 'survived':0, 'score_percent':100, 'scope':'Directed Python finance/validation mutants; no whole-repository claim', 'mutants':results}
+
+def promotion_authorization_assertions(module):
+    promo=qcase(issued='2026-11-23',validUntil='2026-12-14',eventDate='2026-11-30',promotion={'campaignId':'navidad-2026','percent':20})
+    now=dt.datetime(2026,11,23,17,tzinfo=dt.timezone.utc)
+    require(module.validate_quote(promo,creating=True,allow_promotion=True,now=now)['promotion']['percent']==20,'Enrolled promotion rejected')
+    for entitled,clock in ((False,now),(True,dt.datetime(2027,1,3,5,tzinfo=dt.timezone.utc))):
+        try:module.validate_quote(promo,creating=True,allow_promotion=entitled,now=clock)
+        except ValueError:continue
+        raise AssertionError('Unauthorized or expired promotion accepted')
 
 
 def component_storage():
@@ -306,6 +344,7 @@ def main():
     try:
         record('financial-integer-oracle', 'unit/regression', lambda:(financial_assertions(domain),{'cases':len(CASES)})[1])
         record('validation-boundaries', 'unit/security/regression', lambda:(validation_assertions(domain),{'invalid_cases':len(invalid_cases())})[1])
+        record('promotion-authority', 'security/regression',lambda:(promotion_authorization_assertions(domain),{'checks':3})[1])
         if args.node or args.dotnet_probe:
             record('cross-language-financial-parity','integration',lambda:cross_language(args.node,args.dotnet_probe))
         record('directed-real-source-mutations','mutation',mutations)
