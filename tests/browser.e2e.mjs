@@ -10,18 +10,41 @@ const {chromium}=require('playwright');
 const origin=process.env.E2E_ORIGIN||'http://127.0.0.1:3190';
 const artifactName=process.env.OIDC_PROVIDER==='google'?'browser-google':'browser';
 const artifacts=resolve(root,'tests/artifacts',artifactName);mkdirSync(artifacts,{recursive:true});
-const checks=[],errors=[],cspViolations=[];
+const checks=[],errors=[],errorTypes=[],cspViolations=[];
+let previewFailure;
+let pdfPreviewResult;
 const browser=await chromium.launch({headless:true,...(process.env.E2E_BROWSER_CHANNEL?{channel:process.env.E2E_BROWSER_CHANNEL}:{})});
 const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true});
-await context.exposeBinding('__qaReportCsp',(_source,directive)=>{cspViolations.push(String(directive));});
+await context.exposeBinding('__qaReportCsp',(_source,directive)=>{cspViolations.push(String(directive));previewFailure?.({state:'csp-error'});});
 await context.addInitScript(()=>{
  window.addEventListener('securitypolicyviolation',event=>window.__qaReportCsp(event.effectiveDirective));
 });
 const page=await context.newPage();page.setDefaultTimeout(20000);
-page.on('pageerror',e=>errors.push(e.message));
+page.on('pageerror',e=>{errors.push(e.message);errorTypes.push(/^[A-Za-z]+$/.test(e.name)?e.name:'UnknownError');previewFailure?.({state:'browser-error'});});
 function checked(name,condition=true){assert.ok(condition,name);checks.push(name);}
 async function amount(value){await page.locator('.wizard-total strong').filter({hasText:value}).waitFor();}
 async function step(index){await page.getByRole('navigation',{name:'Pasos de la cotización'}).getByRole('button').nth(index).click();await page.locator('#quote-step-'+index).waitFor({state:'visible'});}
+async function waitForRenderedPdf(){
+ const started=performance.now();
+ assert.equal(errors.length,0,'Browser errors occurred before PDF preview');
+ assert.equal(cspViolations.length,0,'CSP violations occurred before PDF preview');
+ const failure=new Promise(resolve=>{previewFailure=resolve;});
+ try{
+  const result=await Promise.race([
+   page.waitForFunction(()=>{
+    const visible=element=>!!element&&getComputedStyle(element).display!=='none'&&getComputedStyle(element).visibility!=='hidden'&&element.getBoundingClientRect().width>0&&element.getBoundingClientRect().height>0;
+    if(Array.from(document.querySelectorAll('.error[role="alert"]')).some(visible))return {state:'preview-alert'};
+    const preview=document.querySelector('.preview-dialog'),canvas=preview?.querySelector('canvas[role="img"]');
+    const rendering=Array.from(preview?.querySelectorAll('[role="status"]')||[]).some(visible);
+    if(visible(canvas)&&canvas.width>300&&canvas.height>300&&!rendering)return {state:'rendered',width:canvas.width,height:canvas.height};
+    return null;
+   },null,{timeout:60000}).then(async handle=>{const result=await handle.jsonValue();await handle.dispose();return result;}),
+   failure,
+  ]);
+  assert.equal(result.state,'rendered','PDF preview reported an application, browser or CSP error');
+  pdfPreviewResult={...result,elapsedMs:Math.round(performance.now()-started)};
+ }finally{previewFailure=undefined;}
+}
 try{
  await page.goto(origin);await page.locator('h1').waitFor();checked('Home renders');
  await page.getByRole('link',{name:'Catálogo',exact:true}).first().click();await page.waitForURL('**/catalogo');
@@ -57,7 +80,8 @@ try{
  checked('Pickup retains confirmed location',await page.locator('[data-field="address"] input').inputValue().then(x=>x.includes('LosPantojados')));
  await step(3);
  await page.getByRole('button',{name:'Ver PDF',exact:true}).click();
- await page.getByRole('img',{name:'Página 1 del PDF de la cotización'}).waitFor({state:'visible'});
+ await waitForRenderedPdf();
+ await page.getByRole('img',{name:'Página 1 del PDF de la cotización'}).waitFor({state:'visible',timeout:1000});
  await page.getByText(/Página 1 de \d/).waitFor();
  checked('PDF.js preview renders the quotation');await page.screenshot({path:resolve(artifacts,'pdf-preview.png')});
  await page.keyboard.press('Escape');
@@ -113,9 +137,18 @@ try{
  checked('No uncaught browser errors',errors.length===0);
  checked('No Content Security Policy violations',cspViolations.length===0);
  checked('Official brand is visible',await page.getByRole('img',{name:'E&A Cotiza',exact:true}).first().isVisible());
- writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'passed',engine:'Chromium',provider:process.env.OIDC_PROVIDER||'standard',channel:process.env.E2E_BROWSER_CHANNEL||'bundled',checks,uncaughtErrors:errors,cspViolations},null,2));
+ writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'passed',engine:'Chromium',provider:process.env.OIDC_PROVIDER||'standard',channel:process.env.E2E_BROWSER_CHANNEL||'bundled',checks,pdfPreview:pdfPreviewResult,uncaughtErrors:errors,cspViolations},null,2));
  console.log(JSON.stringify({browser:'passed',checks:checks.length}));
 }catch(error){
+ const previewState=await page.evaluate(()=>{
+  const preview=document.querySelector('.preview-dialog'),canvas=preview?.querySelector('canvas[role="img"]');
+  return {dialogPresent:!!preview,canvasPresent:!!canvas,canvasWidth:canvas?.width||0,canvasHeight:canvas?.height||0,
+   canvasDisplayed:!!canvas&&getComputedStyle(canvas).display!=='none',loadingStatusPresent:!!preview?.querySelector('[role="status"]'),
+   previewAlertPresent:!!preview?.querySelector('[role="alert"]')};
+ }).catch(()=>({pageUnavailable:true}));
+ // Counts, fixed states and directive names only: never print page URLs or error messages.
+ console.error(JSON.stringify({browserFailure:true,previewState,uncaughtErrorCount:errors.length,errorTypes,
+  cspDirectives:cspViolations.filter(value=>/^[a-z-]+$/.test(value))}));
  await page.screenshot({path:resolve(artifacts,'failure.png'),fullPage:true}).catch(()=>{});
- writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'failed',checks,error:String(error),uncaughtErrors:errors},null,2));throw error;
+ writeFileSync(resolve(artifacts,'results.json'),JSON.stringify({status:'failed',checks,error:String(error),previewState,uncaughtErrors:errors,cspViolations},null,2));throw error;
 }finally{await context.close();await browser.close();}
